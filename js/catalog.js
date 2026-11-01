@@ -11,13 +11,14 @@ export const CLOTH = [
 
 // Each section is one row in the editor. `key` is the option, `colorKey` the colour picked under it.
 export const SECTIONS = [
-  { tab: 'look', title: 'Body', key: 'body', options: [['slim', 'Slim'], ['regular', 'Regular'], ['sturdy', 'Sturdy']] },
+  { tab: 'look', title: 'Body', key: 'body', options: [['slim', 'Slim'], ['regular', 'Regular'], ['athletic', 'Athletic'], ['sturdy', 'Sturdy']] },
+  { tab: 'look', title: 'Face shape', key: 'jaw', options: [['soft', 'Soft'], ['strong', 'Strong jaw']] },
   { tab: 'look', title: 'Skin tone', colorKey: 'skin', palette: SKIN },
-  { tab: 'look', title: 'Expression', key: 'expression', options: [['smile', 'Smile'], ['grin', 'Grin'], ['neutral', 'Calm'], ['surprised', 'Wow']] },
+  { tab: 'look', title: 'Expression', key: 'expression', options: [['smile', 'Smile'], ['grin', 'Grin'], ['excited', 'Excited'], ['confident', 'Confident'], ['neutral', 'Calm'], ['surprised', 'Wow']] },
   { tab: 'look', title: 'Eye colour', colorKey: 'eyes', palette: EYES },
   {
     tab: 'look', title: 'Hair', key: 'hair', colorKey: 'hairColor', palette: HAIR,
-    options: [['bald', 'None'], ['buzz', 'Buzz'], ['short', 'Short'], ['spiky', 'Spiky'], ['long', 'Long'], ['bun', 'Bun'], ['ponytail', 'Ponytail'], ['curly', 'Curly']],
+    options: [['bald', 'None'], ['buzz', 'Buzz'], ['short', 'Short'], ['quiff', 'Quiff'], ['sidepart', 'Side part'], ['spiky', 'Spiky'], ['long', 'Long'], ['bun', 'Bun'], ['ponytail', 'Ponytail'], ['curly', 'Curly']],
   },
   { tab: 'look', title: 'Facial hair', key: 'facialHair', options: [['none', 'None'], ['moustache', 'Moustache'], ['beard', 'Beard']] },
 
@@ -76,7 +77,7 @@ export const OUTFITS = [
 export const PRESETS = [
   {
     name: 'Arjun', config: {
-      body: 'regular', skin: '#c68642', expression: 'smile', eyes: '#3b2a1a', hair: 'short', hairColor: '#1b1b1b', facialHair: 'none',
+      body: 'athletic', jaw: 'strong', skin: '#c68642', expression: 'confident', eyes: '#3b2a1a', hair: 'quiff', hairColor: '#1b1b1b', facialHair: 'none',
       top: 'hoodie', topColor: '#3b82f6', bottom: 'joggers', bottomColor: '#1f2937', shoes: 'sneakers', shoesColor: '#f5f5f5',
       hat: 'headphones', hatColor: '#1f2937', glasses: 'none', glassesColor: '#111111',
     },
@@ -90,7 +91,7 @@ export const PRESETS = [
   },
   {
     name: 'Kai', config: {
-      body: 'regular', skin: '#f1c27d', expression: 'neutral', eyes: '#1e88e5', hair: 'spiky', hairColor: '#2e86de', facialHair: 'none',
+      body: 'athletic', jaw: 'strong', skin: '#f1c27d', expression: 'neutral', eyes: '#1e88e5', hair: 'spiky', hairColor: '#2e86de', facialHair: 'none',
       top: 'jacket', topColor: '#1f2937', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: 'boots', shoesColor: '#7c4a2d',
       hat: 'none', hatColor: '#ef4444', glasses: 'shades', glassesColor: '#111111',
     },
@@ -104,7 +105,7 @@ export const PRESETS = [
   },
   {
     name: 'Sam', config: {
-      body: 'sturdy', skin: '#ffdfc4', expression: 'smile', eyes: '#2e7d32', hair: 'curly', hairColor: '#b5651d', facialHair: 'beard',
+      body: 'sturdy', jaw: 'strong', skin: '#ffdfc4', expression: 'smile', eyes: '#2e7d32', hair: 'curly', hairColor: '#b5651d', facialHair: 'beard',
       top: 'sweater', topColor: '#22c55e', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: 'boots', shoesColor: '#1f2937',
       hat: 'beanie', hatColor: '#f97316', glasses: 'none', glassesColor: '#111111',
     },
@@ -118,7 +119,7 @@ export const PRESETS = [
   },
   {
     name: 'Vikram', config: {
-      body: 'regular', skin: '#c68642', expression: 'smile', eyes: '#3b2a1a', hair: 'short', hairColor: '#1b1b1b', facialHair: 'moustache',
+      body: 'athletic', jaw: 'strong', skin: '#c68642', expression: 'excited', eyes: '#3b2a1a', hair: 'sidepart', hairColor: '#1b1b1b', facialHair: 'moustache',
       top: 'blazer', topColor: '#1e3a5f', tie: 'tie', tieColor: '#7f1d1d', bottom: 'trousers', bottomColor: '#1e3a5f', shoes: 'oxfords', shoesColor: '#111111',
       hat: 'none', hatColor: '#ef4444', glasses: 'square', glassesColor: '#111111',
     },
@@ -132,7 +133,7 @@ export const PRESETS = [
   },
 ];
 
-export const DEFAULT = { tie: 'none', tieColor: '#ef4444', ...PRESETS[0].config };
+export const DEFAULT = { tie: 'none', tieColor: '#ef4444', jaw: 'soft', ...PRESETS[0].config };
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 

@@ -22,23 +22,23 @@
       <button id="random" title="Random avatar">🎲 <span>Randomize</span></button>
       <button id="undo" title="Undo (Ctrl+Z)">↶ <span>Undo</span></button>
       <button id="share" title="Copy a link to this avatar">🔗 <span>Share</span></button>
-      <button id="png" class="primary" title="Download a picture">⬇ <span>Save PNG</span></button>
+      <div class="export">
+        <button id="export" class="primary" aria-haspopup="menu" aria-expanded="false" title="Download as a 3D file or picture">⬇ <span>Export</span></button>
+        <div id="export-menu" class="menu" role="menu" hidden>
+          <p class="menu-note">Need FBX? Export GLB, open it in Blender (File → Import → glTF), then File → Export → FBX.</p>
+        </div>
+      </div>
     </nav>
   </header>
 
   <main class="layout">
     <section class="viewport">
       <canvas id="scene" aria-label="3D avatar preview. Drag to rotate, scroll to zoom."></canvas>
-      <div class="poses" role="group" aria-label="Pose">
-        <button data-pose="idle" class="active">Idle</button>
-        <button data-pose="wave">👋 Wave</button>
-        <button data-pose="dance">💃 Dance</button>
-        <button data-pose="jump">⤴ Jump</button>
-        <button data-pose="think">🤔 Think</button>
-      </div>
+      <div id="poses" class="poses" role="group" aria-label="Pose"></div>
       <div class="view-tools">
         <button id="spin" title="Auto-rotate">⟳</button>
-        <button id="recenter" title="Reset camera">⌖</button>
+        <button id="closeup" title="Face close-up">☺</button>
+        <button id="recenter" title="Full body view">⌖</button>
       </div>
       <p class="hint">Drag to rotate · scroll to zoom</p>
     </section>

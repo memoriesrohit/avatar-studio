@@ -2,6 +2,8 @@
 
 import { SECTIONS, TABS, PRESETS, OUTFITS, DEFAULT, randomConfig, sanitize } from './catalog.js';
 import { Stage, renderThumbnails } from './scene.js';
+import { POSES } from './poses.js';
+import { FORMATS, exportAvatar } from './export.js';
 
 const STORAGE_KEY = 'avatar-studio:v1';
 const $ = (sel) => document.querySelector(sel);
@@ -176,24 +178,60 @@ $('#share').onclick = async () => {
     toast('Link is in the address bar: copy it from there');
   }
 };
-$('#png').onclick = () => {
-  const a = document.createElement('a');
-  a.href = stage.snapshot();
-  a.download = 'my-avatar.png';
-  a.click();
-};
+// ---------- export menu ----------
 
-document.querySelectorAll('[data-pose]').forEach((b) => {
+const menu = $('#export-menu');
+const exportBtn = $('#export');
+function toggleMenu(open = menu.hidden) {
+  menu.hidden = !open;
+  exportBtn.setAttribute('aria-expanded', open);
+}
+for (const [id, label, about] of FORMATS) {
+  const item = document.createElement('button');
+  item.setAttribute('role', 'menuitem');
+  item.className = 'menu-item';
+  item.innerHTML = `<strong></strong><span></span>`;
+  item.querySelector('strong').textContent = label;
+  item.querySelector('span').textContent = about;
+  item.onclick = async () => {
+    toggleMenu(false);
+    toast(`Preparing ${label}…`);
+    try {
+      await exportAvatar(stage, id);
+      toast(`${label} downloaded`);
+    } catch (e) {
+      console.error(e);
+      toast(`Couldn't export ${label}: ${e.message}`);
+    }
+  };
+  menu.insertBefore(item, menu.querySelector('.menu-note'));
+}
+exportBtn.onclick = (e) => {
+  e.stopPropagation();
+  toggleMenu();
+};
+document.addEventListener('click', (e) => !menu.contains(e.target) && toggleMenu(false));
+document.addEventListener('keydown', (e) => e.key === 'Escape' && toggleMenu(false));
+
+// ---------- poses ----------
+
+for (const [id, label] of POSES) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.dataset.pose = id;
+  b.classList.toggle('active', id === stage.pose);
   b.onclick = () => {
-    stage.pose = b.dataset.pose;
+    stage.pose = id;
     document.querySelectorAll('[data-pose]').forEach((x) => x.classList.toggle('active', x === b));
   };
-});
+  $('#poses').append(b);
+}
 $('#spin').onclick = () => {
   stage.controls.autoRotate = !stage.controls.autoRotate;
   $('#spin').classList.toggle('active', stage.controls.autoRotate);
 };
 $('#recenter').onclick = () => stage.resetCamera();
+$('#closeup').onclick = () => stage.closeUp();
 
 window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && undoStack.length) {

@@ -71,6 +71,34 @@ button.primary, button.active { background: var(--accent); border-color: var(--a
 .logo { color: var(--accent); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
+.export { position: relative; }
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 10;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+}
+.menu-item:hover { background: var(--chip); }
+.menu-item span { font-size: 12px; color: var(--muted); }
+.menu-note { margin: 6px 8px 4px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
+
 /* ---------- layout ---------- */
 .layout { flex: 1; display: grid; grid-template-columns: 1fr 380px; min-height: 0; }
 
