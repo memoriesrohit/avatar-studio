@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Avatar Studio</title>
+  <meta name="description" content="Create and dress up your own 3D avatar in the browser.">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo" aria-hidden="true">◆</span> Avatar Studio</div>
+    <nav class="actions">
+      <button id="random" title="Random avatar">🎲 <span>Randomize</span></button>
+      <button id="undo" title="Undo (Ctrl+Z)">↶ <span>Undo</span></button>
+      <button id="share" title="Copy a link to this avatar">🔗 <span>Share</span></button>
+      <button id="png" class="primary" title="Download a picture">⬇ <span>Save PNG</span></button>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="viewport">
+      <canvas id="scene" aria-label="3D avatar preview. Drag to rotate, scroll to zoom."></canvas>
+      <div class="poses" role="group" aria-label="Pose">
+        <button data-pose="idle" class="active">Idle</button>
+        <button data-pose="wave">👋 Wave</button>
+        <button data-pose="dance">💃 Dance</button>
+        <button data-pose="jump">⤴ Jump</button>
+        <button data-pose="think">🤔 Think</button>
+      </div>
+      <div class="view-tools">
+        <button id="spin" title="Auto-rotate">⟳</button>
+        <button id="recenter" title="Reset camera">⌖</button>
+      </div>
+      <p class="hint">Drag to rotate · scroll to zoom</p>
+    </section>
+
+    <aside class="panel">
+      <h2>Choose an avatar</h2>
+      <div id="presets" class="presets"></div>
+      <h2>Customize</h2>
+      <div id="tabs" class="tabs" role="tablist"></div>
+      <div id="options"></div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
