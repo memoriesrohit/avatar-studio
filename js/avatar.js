@@ -22,8 +22,16 @@ const TORSO = [[0.001, -0.17], [0.16, -0.13], [0.23, -0.05], [0.245, 0.05], [0.2
 const SHIRT = [[0.105, 0.738], [0.212, 0.702], [0.268, 0.612], [0.277, 0.5], [0.268, 0.35], [0.25, 0.15], [0.262, 0.03]];
 const TANK = [[0.17, 0.675], [0.258, 0.6], [0.274, 0.5], [0.268, 0.35], [0.25, 0.15], [0.262, 0.03]];
 const KURTA = [...SHIRT.slice(0, -1), [0.262, 0.03], [0.285, -0.2], [0.31, -0.45]];
+const SHIRT_TUCKED = [...SHIRT.slice(0, -2), [0.25, 0.15], [0.248, 0.11]];
+const BLAZER = [[0.125, 0.735], [0.226, 0.705], [0.284, 0.615], [0.292, 0.5], [0.283, 0.35], [0.266, 0.15], [0.274, 0.03], [0.285, -0.07]];
 const PANTS = [[0.255, 0.14], [0.258, 0.05], [0.25, -0.05], [0.178, -0.135], [0.001, -0.185]];
 const SKIRT = [[0.256, 0.14], [0.262, 0.05], [0.33, -0.15], [0.43, -0.37]];
+const PENCIL = [[0.256, 0.14], [0.262, 0.05], [0.272, -0.15], [0.252, -0.5]];
+
+const LONG_SLEEVES = ['hoodie', 'jacket', 'sweater', 'shirt', 'blazer', 'flannel'];
+const COLLARED = ['shirt', 'blazer', 'polo', 'flannel'];
+export const TIE_TOPS = ['shirt', 'blazer'];
+const TROUSERS = { jeans: [0.108, 0.104], joggers: [0.108, 0.097], trousers: [0.112, 0.108], chinos: [0.108, 0.1], cargo: [0.12, 0.112] };
 
 function material(color, extra = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0, ...extra });
@@ -31,6 +39,35 @@ function material(color, extra = {}) {
 
 function shade(hex, k) {
   return new THREE.Color(hex).multiplyScalar(k);
+}
+
+/** Checked flannel fabric drawn on a small canvas. */
+function plaid(hex) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#' + new THREE.Color(hex).getHexString();
+  g.fillRect(0, 0, 64, 64);
+  g.fillStyle = 'rgba(0,0,0,0.38)';
+  g.fillRect(0, 20, 64, 16);
+  g.fillRect(20, 0, 16, 64);
+  g.fillStyle = 'rgba(255,255,255,0.35)';
+  g.fillRect(0, 52, 64, 3);
+  g.fillRect(52, 0, 3, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 4);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, side: THREE.DoubleSide });
+}
+
+/** Radius of a lathe profile at height y, so details can sit on the fabric. */
+function radiusAt(profile, y) {
+  for (let i = 0; i < profile.length - 1; i++) {
+    const [r0, y0] = profile[i], [r1, y1] = profile[i + 1];
+    if ((y <= y0 && y >= y1) || (y >= y0 && y <= y1)) return r0 + ((y - y0) / (y1 - y0 || 1)) * (r1 - r0);
+  }
+  return profile[profile.length - 1][0];
 }
 
 function add(parent, geometry, mat, [x, y, z] = [0, 0, 0], rot) {
@@ -50,8 +87,11 @@ function group(parent, [x, y, z] = [0, 0, 0]) {
   return g;
 }
 
-const lathe = (profile, segments = 40) =>
-  new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), segments);
+function lathe(profile, segments = 40, phiStart = 0, phiLength = Math.PI * 2) {
+  // profiles listed top-down would face inwards; always build them bottom-up
+  const points = profile[0][1] > profile[profile.length - 1][1] ? [...profile].reverse() : profile;
+  return new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), segments, phiStart, phiLength);
+}
 
 /** A cylinder from point a to point b. */
 function stick(parent, a, b, radius, mat) {
@@ -77,8 +117,9 @@ function onHead(elevationDeg, aroundDeg, r) {
 export function buildAvatar(cfg) {
   const body = BODY[cfg.body] ?? BODY.regular;
   const skin = material(cfg.skin, { roughness: 0.6 });
-  const top = material(cfg.topColor, { side: THREE.DoubleSide });
+  const top = cfg.top === 'flannel' ? plaid(cfg.topColor) : material(cfg.topColor, { side: THREE.DoubleSide });
   const bottom = material(cfg.bottomColor, { side: THREE.DoubleSide });
+  const bottomTrim = material(shade(cfg.bottomColor, 0.78));
   const hairMat = material(cfg.hairColor, { roughness: 0.85, side: THREE.DoubleSide });
 
   const root = new THREE.Group();
@@ -88,7 +129,7 @@ export function buildAvatar(cfg) {
   add(torso, lathe(TORSO), skin);
 
   const rig = { root, hips, torso, eyes: [] };
-  const sideways = cfg.top === 'tank' ? 'bare' : ['hoodie', 'jacket', 'sweater'].includes(cfg.top) ? 'long' : cfg.top === 'kurta' ? 'three-quarter' : 'short';
+  const sideways = cfg.top === 'tank' ? 'bare' : LONG_SLEEVES.includes(cfg.top) ? 'long' : cfg.top === 'kurta' ? 'three-quarter' : 'short';
 
   // ---- Arms ----
   for (const s of [1, -1]) {
@@ -103,7 +144,9 @@ export function buildAvatar(cfg) {
       add(limb, new THREE.SphereGeometry(0.09, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), top, [0, -0.02, 0]);
       const len = { short: 0.24, 'three-quarter': 0.44, long: 0.56 }[sideways];
       add(limb, new THREE.CylinderGeometry(0.09, 0.083, len, 20, 1, true), top, [0, -0.02 - len / 2, 0]);
-      if (sideways === 'long' && cfg.top !== 'jacket') {
+      if (cfg.top === 'blazer') {
+        add(limb, new THREE.TorusGeometry(0.076, 0.014, 8, 20), material('#f5f5f5'), [0, -0.585, 0], [Math.PI / 2, 0, 0]);
+      } else if (sideways === 'long' && cfg.top !== 'jacket') {
         add(limb, new THREE.TorusGeometry(0.08, 0.016, 8, 20), top, [0, -0.57, 0], [Math.PI / 2, 0, 0]);
       }
     }
@@ -117,11 +160,18 @@ export function buildAvatar(cfg) {
     limb.scale.set(body.limb, 1, body.limb);
     add(limb, new THREE.CapsuleGeometry(0.09, 0.7, 6, 16), skin, [0, -0.42, 0]);
 
-    if (cfg.bottom === 'jeans' || cfg.bottom === 'joggers') {
-      const bot = cfg.bottom === 'joggers' ? 0.097 : 0.104;
-      add(limb, new THREE.CylinderGeometry(0.108, bot, 0.8, 20, 1, true), bottom, [0, -0.4, 0]);
-      if (cfg.bottom === 'joggers') add(limb, new THREE.TorusGeometry(0.097, 0.02, 8, 20), bottom, [0, -0.79, 0], [Math.PI / 2, 0, 0]);
-    } else if (cfg.bottom === 'shorts') {
+    const b = cfg.bottom;
+    if (TROUSERS[b]) {
+      const [rTop, rBot] = TROUSERS[b];
+      add(limb, new THREE.CylinderGeometry(rTop, rBot, 0.8, 20, 1, true), bottom, [0, -0.4, 0]);
+      if (b === 'joggers') add(limb, new THREE.TorusGeometry(0.097, 0.02, 8, 20), bottom, [0, -0.79, 0], [Math.PI / 2, 0, 0]);
+      if (b === 'chinos') add(limb, new THREE.TorusGeometry(0.101, 0.022, 8, 20), bottomTrim, [0, -0.775, 0], [Math.PI / 2, 0, 0]);
+      if (b === 'trousers') add(limb, new THREE.BoxGeometry(0.006, 0.76, 0.006), bottomTrim, [0, -0.4, 0.11]); // front crease
+      if (b === 'cargo') {
+        add(limb, new RoundedBoxGeometry(0.05, 0.14, 0.12, 2, 0.015), bottomTrim, [s * 0.118, -0.36, 0]);
+        add(limb, new THREE.BoxGeometry(0.052, 0.035, 0.125), bottomTrim, [s * 0.12, -0.28, 0]);
+      }
+    } else if (b === 'shorts') {
       add(limb, new THREE.CylinderGeometry(0.11, 0.112, 0.36, 20, 1, true), bottom, [0, -0.17, 0]);
     }
 
@@ -130,13 +180,16 @@ export function buildAvatar(cfg) {
   }
 
   // ---- Clothes on the body ----
-  if (cfg.bottom === 'skirt') {
-    add(hips, lathe(SKIRT), bottom).scale.set(body.w, 1, body.w * 0.85);
+  const skirt = { skirt: SKIRT, pencil: PENCIL }[cfg.bottom];
+  if (skirt) {
+    add(hips, lathe(skirt), bottom).scale.set(body.w, 1, body.w * 0.85);
   } else {
     add(torso, lathe(PANTS), bottom);
-    if (cfg.bottom === 'jeans' && cfg.top !== 'kurta') {
-      add(torso, new THREE.TorusGeometry(0.257, 0.018, 8, 40), material('#3b2314'), [0, 0.12, 0], [Math.PI / 2, 0, 0]);
-      add(torso, new RoundedBoxGeometry(0.07, 0.05, 0.02, 2, 0.008), material('#d4af37', { metalness: 0.8, roughness: 0.3 }), [0, 0.12, 0.27]);
+    // a belt only shows with a tucked-in shirt
+    if (cfg.top === 'shirt' && TROUSERS[cfg.bottom] && cfg.bottom !== 'joggers') {
+      const formal = cfg.bottom === 'trousers';
+      add(torso, new THREE.TorusGeometry(0.257, 0.018, 8, 40), material(formal ? '#151515' : '#3b2314', { roughness: 0.45 }), [0, 0.12, 0], [Math.PI / 2, 0, 0]);
+      add(torso, new RoundedBoxGeometry(0.07, 0.05, 0.02, 2, 0.008), material(formal ? '#c0c0c0' : '#d4af37', { metalness: 0.8, roughness: 0.3 }), [0, 0.12, 0.27]);
     }
   }
   addTop(torso, cfg, top);
@@ -157,12 +210,87 @@ export function buildAvatar(cfg) {
   return rig;
 }
 
+function collar(parent, mat, flat = false) {
+  add(parent, new THREE.CylinderGeometry(0.112, 0.124, flat ? 0.045 : 0.07, 24, 1, true, Math.PI * 0.15, Math.PI * 1.7), mat, [0, 0.755, 0]);
+  for (const s of [1, -1]) {
+    add(parent, new THREE.BoxGeometry(0.07, 0.05, 0.012), mat, [s * 0.045, 0.73, 0.125], [flat ? -0.6 : -0.25, 0, s * 0.6]);
+  }
+}
+
+function buttons(parent, profile, ys, mat, x = 0) {
+  for (const y of ys) add(parent, new THREE.SphereGeometry(0.011, 8, 8), mat, [x, y, radiusAt(profile, y) + 0.004]);
+}
+
+function addTie(torso, cfg, profile) {
+  if (!TIE_TOPS.includes(cfg.top) || !cfg.tie || cfg.tie === 'none') return;
+  const mat = material(cfg.tieColor, { roughness: 0.45, side: THREE.DoubleSide });
+  if (cfg.tie === 'bow') {
+    for (const s of [1, -1]) {
+      add(torso, new THREE.ConeGeometry(0.04, 0.07, 4), mat, [s * 0.035, 0.71, 0.215], [0, 0, s * Math.PI / 2]).scale.set(1, 1, 0.5);
+    }
+    add(torso, new THREE.SphereGeometry(0.018, 10, 8), mat, [0, 0.71, 0.22]);
+    return;
+  }
+  add(torso, new RoundedBoxGeometry(0.05, 0.045, 0.03, 2, 0.01), mat, [0, 0.705, 0.205]);
+  // upper part leans out over the chest, lower part hangs straight
+  const z1 = radiusAt(profile, 0.68) + 0.008, z2 = radiusAt(profile, 0.5) + 0.01;
+  stick(torso, [0, 0.685, z1], [0, 0.5, z2], 0.026, mat).scale.set(1, 1, 0.25);
+  const blade = new THREE.Shape();
+  blade.moveTo(-0.03, 0);
+  blade.lineTo(0.03, 0);
+  blade.lineTo(0.045, -0.17);
+  blade.lineTo(0, -0.21);
+  blade.lineTo(-0.045, -0.17);
+  blade.closePath();
+  add(torso, new THREE.ShapeGeometry(blade), mat, [0, 0.505, z2]);
+}
+
 function addTop(torso, cfg, mat) {
   const t = cfg.top;
-  add(torso, lathe(t === 'tank' ? TANK : t === 'kurta' ? KURTA : SHIRT), mat);
+  const profile = { tank: TANK, kurta: KURTA, shirt: SHIRT_TUCKED, blazer: SHIRT_TUCKED }[t] ?? SHIRT;
   const trim = material(shade(cfg.topColor, 0.8));
+  const white = material('#f5f5f5');
 
-  if (t === 'tshirt') {
+  if (t === 'blazer') {
+    // a white shirt underneath, then the blazer with an open front
+    add(torso, lathe(SHIRT_TUCKED), white);
+    collar(torso, white);
+    add(torso, lathe(BLAZER, 40, 0.28, Math.PI * 2 - 0.56), mat);
+    for (const s of [1, -1]) {
+      const edge = (y) => [s * Math.sin(0.28) * radiusAt(BLAZER, y), y, Math.cos(0.28) * radiusAt(BLAZER, y)];
+      stick(torso, [s * 0.11, 0.72, 0.17], edge(0.36), 0.02, trim).scale.set(1, 1, 0.5); // lapel
+    }
+    add(torso, new THREE.SphereGeometry(0.014, 8, 8), trim, [Math.sin(0.28) * 0.27, 0.27, Math.cos(0.28) * 0.27 + 0.008]);
+    const square = new THREE.Shape();
+    square.moveTo(-0.035, 0);
+    square.lineTo(0.035, 0);
+    square.lineTo(0.02, 0.035);
+    square.lineTo(-0.01, 0.025);
+    square.closePath();
+    const pocket = add(torso, new THREE.ShapeGeometry(square), material(cfg.tieColor ?? '#ef4444', { side: THREE.DoubleSide }), [0.15, 0.5, 0.258]);
+    pocket.rotation.y = 0.55;
+    addTie(torso, cfg, SHIRT_TUCKED);
+    return;
+  }
+
+  add(torso, lathe(profile), mat);
+
+  if (t === 'shirt') {
+    collar(torso, mat);
+    add(torso, new THREE.BoxGeometry(0.035, 0.6, 0.006), trim, [0, 0.42, radiusAt(SHIRT_TUCKED, 0.42)]);
+    buttons(torso, SHIRT_TUCKED, [0.66, 0.54, 0.42, 0.3, 0.18], white);
+    addTie(torso, cfg, SHIRT_TUCKED);
+  } else if (t === 'polo') {
+    collar(torso, trim, true);
+    buttons(torso, SHIRT, [0.66, 0.6], white);
+    add(torso, new THREE.TorusGeometry(0.262, 0.012, 8, 40), trim, [0, 0.04, 0], [Math.PI / 2, 0, 0]);
+  } else if (t === 'flannel') {
+    collar(torso, mat);
+    buttons(torso, SHIRT, [0.64, 0.5, 0.36, 0.22, 0.08], white);
+    for (const s of [1, -1]) {
+      add(torso, new RoundedBoxGeometry(0.09, 0.09, 0.02, 2, 0.008), mat, [s * 0.11, 0.5, radiusAt(SHIRT, 0.5) - 0.02]).rotation.y = s * 0.38;
+    }
+  } else if (t === 'tshirt') {
     add(torso, new THREE.TorusGeometry(0.105, 0.016, 8, 32), trim, [0, 0.738, 0], [Math.PI / 2, 0, 0]);
   } else if (t === 'sweater') {
     add(torso, new THREE.TorusGeometry(0.11, 0.028, 8, 32), trim, [0, 0.735, 0], [Math.PI / 2, 0, 0]);
@@ -203,6 +331,14 @@ function addShoe(leg, cfg, skin) {
   } else if (kind === 'sandals') {
     add(leg, new RoundedBoxGeometry(0.16, 0.03, 0.29, 2, 0.01), mat, [0, -0.935, 0.05]);
     for (const z of [0.0, 0.11]) add(leg, new THREE.BoxGeometry(0.15, 0.02, 0.03), mat, [0, -0.86, z]);
+  } else if (kind === 'oxfords' || kind === 'loafers') {
+    const polished = material(cfg.shoesColor, { roughness: 0.22, metalness: 0.15 });
+    const detail = material(shade(cfg.shoesColor, 0.6), { roughness: 0.3 });
+    add(leg, new THREE.CylinderGeometry(0.092, 0.092, 0.08, 16), material('#2b2b2b'), [0, -0.83, 0]); // sock
+    add(leg, new RoundedBoxGeometry(0.155, 0.09, 0.3, 3, 0.04), polished, [0, -0.9, 0.06]);
+    add(leg, new RoundedBoxGeometry(0.16, 0.022, 0.305, 2, 0.008), material('#1a1a1a'), [0, -0.94, 0.06]);
+    if (kind === 'oxfords') add(leg, new THREE.BoxGeometry(0.05, 0.008, 0.08), detail, [0, -0.853, 0.08]);
+    else add(leg, new THREE.BoxGeometry(0.14, 0.012, 0.025), detail, [0, -0.855, 0.12]);
   }
 }
 
@@ -365,6 +501,7 @@ export function disposeAvatar(rig) {
   rig.root.traverse((o) => {
     if (o.isMesh) {
       o.geometry.dispose();
+      o.material.map?.dispose();
       o.material.dispose();
     }
   });

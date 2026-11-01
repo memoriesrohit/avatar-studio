@@ -6,9 +6,11 @@
 
 ## Features
 
-- **6 starter avatars** to choose from, with live 3D thumbnails
+- **8 starter avatars** to choose from, with live 3D thumbnails, including two in office wear
 - **Look:** body type, skin tone, expression, eye colour, 8 hairstyles plus hair colour, facial hair
-- **Clothes:** t-shirt, hoodie, jacket, sweater, kurta or tank top; jeans, joggers, shorts or skirt; sneakers, boots, sandals or barefoot
+- **Office formals:** dress shirt (tucked in, with belt), blazer suit with pocket square, necktie or bow tie, formal trousers with crease, pencil skirt, oxfords and loafers
+- **Casuals:** t-shirt, polo, checked flannel, hoodie, sweater, jacket, kurta, tank top; jeans, chinos, cargo pants, joggers, shorts, skirt; sneakers, boots, sandals or barefoot
+- **Quick outfits:** one click for Office formal, Office skirt suit, Business casual, Black tie, Weekend casual, Flannel & denim or Streetwear. Outfits change only the clothes, so your avatar's face and hair stay the same.
 - **Extras:** cap, beanie, sun hat, top hat or headphones; round, square or sunglasses
 - **Any colour:** every item has a palette plus a custom colour picker
 - **Poses:** idle (breathing and blinking), wave, dance, jump, think, with smooth blending between them
@@ -45,7 +47,7 @@ js/main.js        editor panel, undo, share links, saving
 
 ## Adding your own item
 
-1. Add the option to its section in `js/catalog.js`, for example `['scarf', 'Scarf']` under *Headwear*.
+1. Add the option to its section in `js/catalog.js`, for example `['scarf', 'Scarf']` under *Headwear*. To add a whole look, add an entry to `OUTFITS`.
 2. Build its shape in the matching function in `js/avatar.js` (`addHat`, `addTop`, `addShoe`, …) using the `add()` helper.
 3. Reload the page. The editor picks up the new option automatically.
 

@@ -4,8 +4,9 @@ export const SKIN = ['#ffdfc4', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#5c
 export const HAIR = ['#1b1b1b', '#3b2314', '#6a4e23', '#b5651d', '#e6c27a', '#d64545', '#8e44ad', '#2e86de', '#d9d9d9'];
 export const EYES = ['#3b2a1a', '#6b4f2a', '#2e7d32', '#1e88e5', '#607d8b', '#8e24aa'];
 export const CLOTH = [
-  '#f5f5f5', '#1f2937', '#ef4444', '#f97316', '#eab308', '#22c55e',
-  '#14b8a6', '#3b82f6', '#1e3a5f', '#6366f1', '#a855f7', '#ec4899', '#7c4a2d',
+  '#f5f5f5', '#bfdbfe', '#6b7280', '#1f2937', '#111111', '#1e3a5f', '#3b82f6', '#6366f1',
+  '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#7f1d1d', '#ec4899', '#a855f7',
+  '#c8a97e', '#7c4a2d',
 ];
 
 // Each section is one row in the editor. `key` is the option, `colorKey` the colour picked under it.
@@ -22,15 +23,29 @@ export const SECTIONS = [
 
   {
     tab: 'clothes', title: 'Top', key: 'top', colorKey: 'topColor', palette: CLOTH,
-    options: [['tshirt', 'T-shirt'], ['hoodie', 'Hoodie'], ['jacket', 'Jacket'], ['sweater', 'Sweater'], ['kurta', 'Kurta'], ['tank', 'Tank top']],
+    groups: [
+      ['Formal', [['shirt', 'Dress shirt'], ['blazer', 'Blazer']]],
+      ['Casual', [['tshirt', 'T-shirt'], ['polo', 'Polo'], ['flannel', 'Flannel'], ['hoodie', 'Hoodie'], ['sweater', 'Sweater'], ['jacket', 'Jacket'], ['kurta', 'Kurta'], ['tank', 'Tank top']]],
+    ],
+  },
+  {
+    tab: 'clothes', title: 'Tie', key: 'tie', colorKey: 'tieColor', palette: CLOTH,
+    options: [['none', 'None'], ['tie', 'Necktie'], ['bow', 'Bow tie']],
+    when: (c) => c.top === 'shirt' || c.top === 'blazer',
   },
   {
     tab: 'clothes', title: 'Bottom', key: 'bottom', colorKey: 'bottomColor', palette: CLOTH,
-    options: [['jeans', 'Jeans'], ['joggers', 'Joggers'], ['shorts', 'Shorts'], ['skirt', 'Skirt']],
+    groups: [
+      ['Formal', [['trousers', 'Trousers'], ['pencil', 'Pencil skirt']]],
+      ['Casual', [['jeans', 'Jeans'], ['chinos', 'Chinos'], ['cargo', 'Cargo'], ['joggers', 'Joggers'], ['shorts', 'Shorts'], ['skirt', 'Skirt']]],
+    ],
   },
   {
     tab: 'clothes', title: 'Shoes', key: 'shoes', colorKey: 'shoesColor', palette: CLOTH,
-    options: [['sneakers', 'Sneakers'], ['boots', 'Boots'], ['sandals', 'Sandals'], ['barefoot', 'Barefoot']],
+    groups: [
+      ['Formal', [['oxfords', 'Oxfords'], ['loafers', 'Loafers']]],
+      ['Casual', [['sneakers', 'Sneakers'], ['boots', 'Boots'], ['sandals', 'Sandals'], ['barefoot', 'Barefoot']]],
+    ],
   },
 
   {
@@ -43,7 +58,20 @@ export const SECTIONS = [
   },
 ];
 
+for (const s of SECTIONS) if (s.groups) s.options = s.groups.flatMap(([, opts]) => opts);
+
 export const TABS = [['look', 'Look'], ['clothes', 'Clothes'], ['extras', 'Extras']];
+
+// One-click outfits: they change only the clothes, never the face or hair.
+export const OUTFITS = [
+  { name: 'Office formal', set: { top: 'blazer', topColor: '#1e3a5f', tie: 'tie', tieColor: '#7f1d1d', bottom: 'trousers', bottomColor: '#1e3a5f', shoes: 'oxfords', shoesColor: '#111111' } },
+  { name: 'Office skirt suit', set: { top: 'blazer', topColor: '#1f2937', tie: 'none', tieColor: '#ec4899', bottom: 'pencil', bottomColor: '#1f2937', shoes: 'loafers', shoesColor: '#111111' } },
+  { name: 'Business casual', set: { top: 'shirt', topColor: '#bfdbfe', tie: 'none', bottom: 'chinos', bottomColor: '#c8a97e', shoes: 'loafers', shoesColor: '#7c4a2d' } },
+  { name: 'Black tie', set: { top: 'shirt', topColor: '#f5f5f5', tie: 'bow', tieColor: '#111111', bottom: 'trousers', bottomColor: '#111111', shoes: 'oxfords', shoesColor: '#111111' } },
+  { name: 'Weekend casual', set: { top: 'polo', topColor: '#22c55e', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: 'sneakers', shoesColor: '#f5f5f5' } },
+  { name: 'Flannel & denim', set: { top: 'flannel', topColor: '#ef4444', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: 'boots', shoesColor: '#7c4a2d' } },
+  { name: 'Streetwear', set: { top: 'hoodie', topColor: '#111111', bottom: 'cargo', bottomColor: '#6b7280', shoes: 'sneakers', shoesColor: '#f5f5f5' } },
+];
 
 export const PRESETS = [
   {
@@ -88,9 +116,23 @@ export const PRESETS = [
       hat: 'none', hatColor: '#ef4444', glasses: 'square', glassesColor: '#d4af37',
     },
   },
+  {
+    name: 'Vikram', config: {
+      body: 'regular', skin: '#c68642', expression: 'smile', eyes: '#3b2a1a', hair: 'short', hairColor: '#1b1b1b', facialHair: 'moustache',
+      top: 'blazer', topColor: '#1e3a5f', tie: 'tie', tieColor: '#7f1d1d', bottom: 'trousers', bottomColor: '#1e3a5f', shoes: 'oxfords', shoesColor: '#111111',
+      hat: 'none', hatColor: '#ef4444', glasses: 'square', glassesColor: '#111111',
+    },
+  },
+  {
+    name: 'Neha', config: {
+      body: 'slim', skin: '#e0ac69', expression: 'smile', eyes: '#3b2a1a', hair: 'bun', hairColor: '#3b2314', facialHair: 'none',
+      top: 'blazer', topColor: '#1f2937', tie: 'none', tieColor: '#ec4899', bottom: 'pencil', bottomColor: '#1f2937', shoes: 'loafers', shoesColor: '#111111',
+      hat: 'none', hatColor: '#ef4444', glasses: 'none', glassesColor: '#111111',
+    },
+  },
 ];
 
-export const DEFAULT = PRESETS[0].config;
+export const DEFAULT = { tie: 'none', tieColor: '#ef4444', ...PRESETS[0].config };
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 

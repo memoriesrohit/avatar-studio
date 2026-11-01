@@ -1,6 +1,6 @@
 // Editor UI: avatar picker, option chips, colour swatches, undo, share, save.
 
-import { SECTIONS, TABS, PRESETS, DEFAULT, randomConfig, sanitize } from './catalog.js';
+import { SECTIONS, TABS, PRESETS, OUTFITS, DEFAULT, randomConfig, sanitize } from './catalog.js';
 import { Stage, renderThumbnails } from './scene.js';
 
 const STORAGE_KEY = 'avatar-studio:v1';
@@ -75,6 +75,21 @@ function swatches(section) {
   return row;
 }
 
+function outfitPicker() {
+  const box = document.createElement('section');
+  box.className = 'option outfits';
+  const h = document.createElement('h3');
+  h.textContent = 'Quick outfits';
+  const row = document.createElement('div');
+  row.className = 'chips';
+  for (const o of OUTFITS) {
+    const worn = Object.entries(o.set).every(([k, v]) => config[k] === v);
+    row.append(chip(o.name, worn, () => update({ ...config, ...o.set })));
+  }
+  box.append(h, row);
+  return box;
+}
+
 function render() {
   const tabs = $('#tabs');
   tabs.replaceChildren(...TABS.map(([id, label]) => {
@@ -86,16 +101,24 @@ function render() {
 
   const body = $('#options');
   body.replaceChildren();
-  for (const s of SECTIONS.filter((x) => x.tab === tab)) {
+  if (tab === 'clothes') body.append(outfitPicker());
+  for (const s of SECTIONS.filter((x) => x.tab === tab && (!x.when || x.when(config)))) {
     const box = document.createElement('section');
     box.className = 'option';
     const h = document.createElement('h3');
     h.textContent = s.title;
     box.append(h);
-    if (s.key) {
+    for (const [label, options] of s.groups ?? [[null, s.options ?? []]]) {
+      if (!s.key) break;
+      if (label) {
+        const sub = document.createElement('div');
+        sub.className = 'group-label';
+        sub.textContent = label;
+        box.append(sub);
+      }
       const row = document.createElement('div');
       row.className = 'chips';
-      for (const [id, label] of s.options) row.append(chip(label, config[s.key] === id, () => update({ ...config, [s.key]: id })));
+      for (const [id, text] of options) row.append(chip(text, config[s.key] === id, () => update({ ...config, [s.key]: id })));
       box.append(row);
     }
     const hideColour = s.key && ['none', 'bald', 'barefoot'].includes(config[s.key]);
