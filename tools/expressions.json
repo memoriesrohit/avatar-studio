@@ -1,0 +1,34 @@
+{
+  "Neutral": {},
+  "Smile": {
+    "mouth-corner-puller": 0.8, "mouth-upward-retraction": 0.2, "eye-left-slit": 0.15, "eye-right-slit": 0.15,
+    "nose-left-elevation": 0.15, "nose-right-elevation": 0.15
+  },
+  "Big laugh": {
+    "mouth-corner-puller": 1.0, "mouth-open": 0.55, "mouth-upward-retraction": 0.35, "eye-left-slit": 0.35, "eye-right-slit": 0.35,
+    "eyebrows-left-up": 0.3, "eyebrows-right-up": 0.3, "nose-left-elevation": 0.3, "nose-right-elevation": 0.3
+  },
+  "Excited": {
+    "mouth-corner-puller": 0.9, "mouth-open": 0.7, "eyebrows-left-up": 0.8, "eyebrows-right-up": 0.8,
+    "eye-left-opened-up": 0.5, "eye-right-opened-up": 0.5
+  },
+  "Confident": {
+    "mouth-corner-puller": 0.35, "mouth-compression": 0.25, "eyebrows-right-up": 0.45, "eye-left-slit": 0.25, "eye-right-slit": 0.25
+  },
+  "Serious": {
+    "eyebrows-left-down": 0.55, "eyebrows-right-down": 0.55, "mouth-compression": 0.5, "eye-left-slit": 0.2, "eye-right-slit": 0.2
+  },
+  "Surprised": {
+    "eyebrows-left-up": 1.0, "eyebrows-right-up": 1.0, "eye-left-opened-up": 0.9, "eye-right-opened-up": 0.9, "mouth-open": 0.55
+  },
+  "Angry": {
+    "eyebrows-left-down": 1.0, "eyebrows-right-down": 1.0, "eye-left-slit": 0.4, "eye-right-slit": 0.4,
+    "mouth-compression": 0.6, "nose-left-dilatation": 0.6, "nose-right-dilatation": 0.6, "mouth-depression": 0.3
+  },
+  "Sad": {
+    "eyebrows-left-inner-up": 1.0, "eyebrows-right-inner-up": 1.0, "mouth-depression": 0.7, "eye-left-slit": 0.2, "eye-right-slit": 0.2
+  },
+  "Wink": {
+    "eye-left-closure": 1.0, "mouth-corner-puller": 0.6, "eyebrows-left-down": 0.3
+  }
+}

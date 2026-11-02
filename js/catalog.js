@@ -1,162 +1,72 @@
-// Everything you can pick in the editor: options, colour palettes and starter avatars.
+// The people, outfits, outfit colours and facial expressions you can pick in the editor.
+// The characters themselves are rigged GLB files in models/, built in Blender by tools/build.py.
 
-export const SKIN = ['#ffdfc4', '#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#5c3a21'];
-export const HAIR = ['#1b1b1b', '#3b2314', '#6a4e23', '#b5651d', '#e6c27a', '#d64545', '#8e44ad', '#2e86de', '#d9d9d9'];
-export const EYES = ['#3b2a1a', '#6b4f2a', '#2e7d32', '#1e88e5', '#607d8b', '#8e24aa'];
-export const CLOTH = [
-  '#f5f5f5', '#bfdbfe', '#6b7280', '#1f2937', '#111111', '#1e3a5f', '#3b82f6', '#6366f1',
-  '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#7f1d1d', '#ec4899', '#a855f7',
-  '#c8a97e', '#7c4a2d',
+export const OUTFITS = { formal: 'Office formal', casual: 'Casual', smart: 'Smart casual' };
+
+export const PEOPLE = [
+  { id: 'arjun', name: 'Arjun', about: '28, athletic', outfits: ['formal', 'smart', 'casual'] },
+  { id: 'vikram', name: 'Vikram', about: '40, business owner', outfits: ['formal', 'smart', 'casual'] },
+  { id: 'daniel', name: 'Daniel', about: '31, designer', outfits: ['formal', 'smart', 'casual'] },
+  { id: 'marcus', name: 'Marcus', about: '26, fitness coach', outfits: ['formal', 'smart', 'casual'] },
+  { id: 'meera', name: 'Meera', about: '27, engineer', outfits: ['formal', 'smart', 'casual'] },
+  { id: 'sarah', name: 'Sarah', about: '34, manager', outfits: ['formal', 'smart', 'casual'] },
 ];
 
-// Each section is one row in the editor. `key` is the option, `colorKey` the colour picked under it.
-export const SECTIONS = [
-  { tab: 'look', title: 'Body', key: 'body', options: [['slim', 'Slim'], ['regular', 'Regular'], ['athletic', 'Athletic'], ['sturdy', 'Sturdy']] },
-  { tab: 'look', title: 'Face shape', key: 'jaw', options: [['soft', 'Soft'], ['strong', 'Strong jaw']] },
-  { tab: 'look', title: 'Skin tone', colorKey: 'skin', palette: SKIN },
-  { tab: 'look', title: 'Expression', key: 'expression', options: [['smile', 'Smile'], ['grin', 'Grin'], ['excited', 'Excited'], ['confident', 'Confident'], ['neutral', 'Calm'], ['surprised', 'Wow']] },
-  { tab: 'look', title: 'Eye colour', colorKey: 'eyes', palette: EYES },
-  {
-    tab: 'look', title: 'Hair', key: 'hair', colorKey: 'hairColor', palette: HAIR,
-    options: [['bald', 'None'], ['buzz', 'Buzz'], ['short', 'Short'], ['quiff', 'Quiff'], ['sidepart', 'Side part'], ['spiky', 'Spiky'], ['long', 'Long'], ['bun', 'Bun'], ['ponytail', 'Ponytail'], ['curly', 'Curly']],
-  },
-  { tab: 'look', title: 'Facial hair', key: 'facialHair', options: [['none', 'None'], ['moustache', 'Moustache'], ['beard', 'Beard']] },
-
-  {
-    tab: 'clothes', title: 'Top', key: 'top', colorKey: 'topColor', palette: CLOTH,
-    groups: [
-      ['Formal', [['shirt', 'Dress shirt'], ['blazer', 'Blazer']]],
-      ['Casual', [['tshirt', 'T-shirt'], ['polo', 'Polo'], ['flannel', 'Flannel'], ['hoodie', 'Hoodie'], ['sweater', 'Sweater'], ['jacket', 'Jacket'], ['kurta', 'Kurta'], ['tank', 'Tank top']]],
-    ],
-  },
-  {
-    tab: 'clothes', title: 'Tie', key: 'tie', colorKey: 'tieColor', palette: CLOTH,
-    options: [['none', 'None'], ['tie', 'Necktie'], ['bow', 'Bow tie']],
-    when: (c) => c.top === 'shirt' || c.top === 'blazer',
-  },
-  {
-    tab: 'clothes', title: 'Bottom', key: 'bottom', colorKey: 'bottomColor', palette: CLOTH,
-    groups: [
-      ['Formal', [['trousers', 'Trousers'], ['pencil', 'Pencil skirt']]],
-      ['Casual', [['jeans', 'Jeans'], ['chinos', 'Chinos'], ['cargo', 'Cargo'], ['joggers', 'Joggers'], ['shorts', 'Shorts'], ['skirt', 'Skirt']]],
-    ],
-  },
-  {
-    tab: 'clothes', title: 'Shoes', key: 'shoes', colorKey: 'shoesColor', palette: CLOTH,
-    groups: [
-      ['Formal', [['oxfords', 'Oxfords'], ['loafers', 'Loafers']]],
-      ['Casual', [['sneakers', 'Sneakers'], ['boots', 'Boots'], ['sandals', 'Sandals'], ['barefoot', 'Barefoot']]],
-    ],
-  },
-
-  {
-    tab: 'extras', title: 'Headwear', key: 'hat', colorKey: 'hatColor', palette: CLOTH,
-    options: [['none', 'None'], ['cap', 'Cap'], ['beanie', 'Beanie'], ['sunhat', 'Sun hat'], ['tophat', 'Top hat'], ['headphones', 'Headphones']],
-  },
-  {
-    tab: 'extras', title: 'Glasses', key: 'glasses', colorKey: 'glassesColor', palette: ['#111111', '#7c4a2d', '#d4af37', '#ef4444', '#3b82f6', '#f5f5f5'],
-    options: [['none', 'None'], ['round', 'Round'], ['square', 'Square'], ['shades', 'Shades']],
-  },
+// Outfit colours multiply the fabric texture; null keeps the original colours.
+export const TINTS = [
+  [null, 'Original'], ['#2b3a55', 'Navy'], ['#3a3a3a', 'Charcoal'], ['#6b5a46', 'Brown'], ['#b8b2a6', 'Stone'],
+  ['#7a1f2b', 'Burgundy'], ['#2f5d50', 'Forest'], ['#4a6fa5', 'Blue'], ['#d9d4c7', 'Cream'],
 ];
 
-for (const s of SECTIONS) if (s.groups) s.options = s.groups.flatMap(([, opts]) => opts);
+// Facial expressions as mixes of MakeHuman face units (morph targets on the face, brows, lashes and teeth).
+export const EXPRESSIONS = {
+  Neutral: {},
+  Smile: {
+    'mouth-corner-puller': 0.8, 'mouth-upward-retraction': 0.2, 'eye-left-slit': 0.15, 'eye-right-slit': 0.15,
+    'nose-left-elevation': 0.15, 'nose-right-elevation': 0.15,
+  },
+  'Big laugh': {
+    'mouth-corner-puller': 1, 'mouth-open': 0.55, 'mouth-upward-retraction': 0.35, 'eye-left-slit': 0.35, 'eye-right-slit': 0.35,
+    'eyebrows-left-up': 0.3, 'eyebrows-right-up': 0.3, 'nose-left-elevation': 0.3, 'nose-right-elevation': 0.3,
+  },
+  Excited: {
+    'mouth-corner-puller': 0.9, 'mouth-open': 0.7, 'eyebrows-left-up': 0.8, 'eyebrows-right-up': 0.8,
+    'eye-left-opened-up': 0.5, 'eye-right-opened-up': 0.5,
+  },
+  Confident: {
+    'mouth-corner-puller': 0.35, 'mouth-compression': 0.25, 'eyebrows-right-up': 0.45, 'eye-left-slit': 0.25, 'eye-right-slit': 0.25,
+  },
+  Serious: {
+    'eyebrows-left-down': 0.55, 'eyebrows-right-down': 0.55, 'mouth-compression': 0.5, 'eye-left-slit': 0.2, 'eye-right-slit': 0.2,
+  },
+  Surprised: {
+    'eyebrows-left-up': 1, 'eyebrows-right-up': 1, 'eye-left-opened-up': 0.9, 'eye-right-opened-up': 0.9, 'mouth-open': 0.55,
+  },
+  Angry: {
+    'eyebrows-left-down': 1, 'eyebrows-right-down': 1, 'eye-left-slit': 0.4, 'eye-right-slit': 0.4,
+    'mouth-compression': 0.6, 'nose-left-dilatation': 0.6, 'nose-right-dilatation': 0.6, 'mouth-depression': 0.3,
+  },
+  Sad: {
+    'eyebrows-left-inner-up': 1, 'eyebrows-right-inner-up': 1, 'mouth-depression': 0.7, 'eye-left-slit': 0.2, 'eye-right-slit': 0.2,
+  },
+  Wink: { 'eye-left-closure': 1, 'mouth-corner-puller': 0.6, 'eyebrows-left-down': 0.3 },
+};
 
-export const TABS = [['look', 'Look'], ['clothes', 'Clothes'], ['extras', 'Extras']];
+export const DEFAULT = { person: 'arjun', outfit: 'formal', tint: null, expression: 'Smile', move: 'Idle' };
 
-// One-click outfits: they change only the clothes, never the face or hair.
-export const OUTFITS = [
-  { name: 'Office formal', set: { top: 'blazer', topColor: '#1e3a5f', tie: 'tie', tieColor: '#7f1d1d', bottom: 'trousers', bottomColor: '#1e3a5f', shoes: 'oxfords', shoesColor: '#111111' } },
-  { name: 'Office skirt suit', set: { top: 'blazer', topColor: '#1f2937', tie: 'none', tieColor: '#ec4899', bottom: 'pencil', bottomColor: '#1f2937', shoes: 'loafers', shoesColor: '#111111' } },
-  { name: 'Business casual', set: { top: 'shirt', topColor: '#bfdbfe', tie: 'none', bottom: 'chinos', bottomColor: '#c8a97e', shoes: 'loafers', shoesColor: '#7c4a2d' } },
-  { name: 'Black tie', set: { top: 'shirt', topColor: '#f5f5f5', tie: 'bow', tieColor: '#111111', bottom: 'trousers', bottomColor: '#111111', shoes: 'oxfords', shoesColor: '#111111' } },
-  { name: 'Weekend casual', set: { top: 'polo', topColor: '#22c55e', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: 'sneakers', shoesColor: '#f5f5f5' } },
-  { name: 'Flannel & denim', set: { top: 'flannel', topColor: '#ef4444', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: 'boots', shoesColor: '#7c4a2d' } },
-  { name: 'Streetwear', set: { top: 'hoodie', topColor: '#111111', bottom: 'cargo', bottomColor: '#6b7280', shoes: 'sneakers', shoesColor: '#f5f5f5' } },
-];
+export const modelUrl = (person, outfit) => `models/${person}_${outfit}.glb`;
+export const thumbUrl = (person) => `models/thumbs/${person}.jpg`;
 
-export const PRESETS = [
-  {
-    name: 'Arjun', config: {
-      body: 'athletic', jaw: 'strong', skin: '#c68642', expression: 'confident', eyes: '#3b2a1a', hair: 'quiff', hairColor: '#1b1b1b', facialHair: 'none',
-      top: 'hoodie', topColor: '#3b82f6', bottom: 'joggers', bottomColor: '#1f2937', shoes: 'sneakers', shoesColor: '#f5f5f5',
-      hat: 'headphones', hatColor: '#1f2937', glasses: 'none', glassesColor: '#111111',
-    },
-  },
-  {
-    name: 'Meera', config: {
-      body: 'slim', skin: '#e0ac69', expression: 'grin', eyes: '#3b2a1a', hair: 'long', hairColor: '#1b1b1b', facialHair: 'none',
-      top: 'kurta', topColor: '#ec4899', bottom: 'jeans', bottomColor: '#f5f5f5', shoes: 'sandals', shoesColor: '#d4af37',
-      hat: 'none', hatColor: '#ef4444', glasses: 'round', glassesColor: '#7c4a2d',
-    },
-  },
-  {
-    name: 'Kai', config: {
-      body: 'athletic', jaw: 'strong', skin: '#f1c27d', expression: 'neutral', eyes: '#1e88e5', hair: 'spiky', hairColor: '#2e86de', facialHair: 'none',
-      top: 'jacket', topColor: '#1f2937', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: 'boots', shoesColor: '#7c4a2d',
-      hat: 'none', hatColor: '#ef4444', glasses: 'shades', glassesColor: '#111111',
-    },
-  },
-  {
-    name: 'Zoe', config: {
-      body: 'slim', skin: '#8d5524', expression: 'smile', eyes: '#6b4f2a', hair: 'ponytail', hairColor: '#3b2314', facialHair: 'none',
-      top: 'tank', topColor: '#eab308', bottom: 'shorts', bottomColor: '#14b8a6', shoes: 'sneakers', shoesColor: '#ef4444',
-      hat: 'cap', hatColor: '#ef4444', glasses: 'none', glassesColor: '#111111',
-    },
-  },
-  {
-    name: 'Sam', config: {
-      body: 'sturdy', jaw: 'strong', skin: '#ffdfc4', expression: 'smile', eyes: '#2e7d32', hair: 'curly', hairColor: '#b5651d', facialHair: 'beard',
-      top: 'sweater', topColor: '#22c55e', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: 'boots', shoesColor: '#1f2937',
-      hat: 'beanie', hatColor: '#f97316', glasses: 'none', glassesColor: '#111111',
-    },
-  },
-  {
-    name: 'Ivy', config: {
-      body: 'regular', skin: '#5c3a21', expression: 'surprised', eyes: '#3b2a1a', hair: 'bun', hairColor: '#8e44ad', facialHair: 'none',
-      top: 'tshirt', topColor: '#f5f5f5', bottom: 'skirt', bottomColor: '#a855f7', shoes: 'sneakers', shoesColor: '#1f2937',
-      hat: 'none', hatColor: '#ef4444', glasses: 'square', glassesColor: '#d4af37',
-    },
-  },
-  {
-    name: 'Vikram', config: {
-      body: 'athletic', jaw: 'strong', skin: '#c68642', expression: 'excited', eyes: '#3b2a1a', hair: 'sidepart', hairColor: '#1b1b1b', facialHair: 'moustache',
-      top: 'blazer', topColor: '#1e3a5f', tie: 'tie', tieColor: '#7f1d1d', bottom: 'trousers', bottomColor: '#1e3a5f', shoes: 'oxfords', shoesColor: '#111111',
-      hat: 'none', hatColor: '#ef4444', glasses: 'square', glassesColor: '#111111',
-    },
-  },
-  {
-    name: 'Neha', config: {
-      body: 'slim', skin: '#e0ac69', expression: 'smile', eyes: '#3b2a1a', hair: 'bun', hairColor: '#3b2314', facialHair: 'none',
-      top: 'blazer', topColor: '#1f2937', tie: 'none', tieColor: '#ec4899', bottom: 'pencil', bottomColor: '#1f2937', shoes: 'loafers', shoesColor: '#111111',
-      hat: 'none', hatColor: '#ef4444', glasses: 'none', glassesColor: '#111111',
-    },
-  },
-];
-
-export const DEFAULT = { tie: 'none', tieColor: '#ef4444', jaw: 'soft', ...PRESETS[0].config };
-
-const pick = (list) => list[Math.floor(Math.random() * list.length)];
-
-export function randomConfig() {
-  const c = {};
-  for (const s of SECTIONS) {
-    if (s.key) c[s.key] = pick(s.options)[0];
-    if (s.colorKey) c[s.colorKey] = pick(s.palette);
-  }
-  // Keep random avatars looking good: facial hair and odd extras only sometimes.
-  if (Math.random() < 0.6) c.facialHair = 'none';
-  if (Math.random() < 0.5) c.hat = 'none';
-  if (Math.random() < 0.5) c.glasses = 'none';
-  return c;
-}
-
-/** Accept only known option ids and #rrggbb colours (configs can come from share links). */
+/** Accept only known values (configs can come from share links). */
 export function sanitize(input) {
   const c = { ...DEFAULT };
   if (!input || typeof input !== 'object') return c;
-  for (const s of SECTIONS) {
-    if (s.key && s.options.some(([id]) => id === input[s.key])) c[s.key] = input[s.key];
-    if (s.colorKey && /^#[0-9a-f]{6}$/i.test(input[s.colorKey] ?? '')) c[s.colorKey] = input[s.colorKey];
-  }
+  const person = PEOPLE.find((p) => p.id === input.person);
+  if (person) c.person = person.id;
+  const outfits = PEOPLE.find((p) => p.id === c.person).outfits;
+  c.outfit = outfits.includes(input.outfit) ? input.outfit : outfits[0];
+  if (TINTS.some(([hex]) => hex === input.tint)) c.tint = input.tint;
+  if (input.expression in EXPRESSIONS) c.expression = input.expression;
+  if (typeof input.move === 'string' && /^[\w ]{1,30}$/.test(input.move)) c.move = input.move;
   return c;
 }

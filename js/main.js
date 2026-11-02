@@ -1,17 +1,14 @@
-// Editor UI: avatar picker, option chips, colour swatches, undo, share, save.
+// Editor UI: pick a person, outfit, outfit colour, expression and move; share and export.
 
-import { SECTIONS, TABS, PRESETS, OUTFITS, DEFAULT, randomConfig, sanitize } from './catalog.js';
-import { Stage, renderThumbnails } from './scene.js';
-import { POSES } from './poses.js';
+import { PEOPLE, OUTFITS, TINTS, EXPRESSIONS, modelUrl, thumbUrl, sanitize, DEFAULT } from './catalog.js';
+import { Stage } from './scene.js';
 import { FORMATS, exportAvatar } from './export.js';
 
-const STORAGE_KEY = 'avatar-studio:v1';
+const STORAGE_KEY = 'avatar-studio:v2';
 const $ = (sel) => document.querySelector(sel);
 
 const stage = new Stage($('#scene'));
 let config = loadInitial();
-let tab = 'look';
-const undoStack = [];
 
 function loadInitial() {
   const hash = new URLSearchParams(location.hash.slice(1)).get('a');
@@ -27,17 +24,48 @@ function loadInitial() {
   return { ...DEFAULT };
 }
 
-function update(next, { record = true } = {}) {
-  if (record) {
-    undoStack.push(config);
-    if (undoStack.length > 50) undoStack.shift();
-  }
-  config = sanitize(next);
-  stage.setAvatar(config);
+function save() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-  } catch { /* storage blocked: still works, just not remembered */ }
+  } catch { /* fine: just not remembered */ }
+}
+
+// ---------- loading ----------
+
+let loadToken = 0;
+async function showCharacter() {
+  const token = ++loadToken;
+  const overlay = $('#loading');
+  overlay.hidden = false;
+  $('#loading-text').textContent = `Loading ${PEOPLE.find((p) => p.id === config.person).name}…`;
+  try {
+    await stage.load(modelUrl(config.person, config.outfit), (f) => {
+      if (token === loadToken) $('#loading-bar').style.width = `${Math.round(f * 100)}%`;
+    });
+    if (token !== loadToken) return;
+    stage.applyTint(config.tint);
+    stage.expression = config.expression;
+    stage.playMove(config.move, 0);
+    renderMoves();
+  } catch (e) {
+    console.error(e);
+    toast(`Couldn't load this character: ${e.message}`);
+  } finally {
+    if (token === loadToken) overlay.hidden = true;
+  }
+}
+
+function update(changes) {
+  const before = config;
+  config = sanitize({ ...config, ...changes });
+  save();
   render();
+  if (config.person !== before.person || config.outfit !== before.outfit) showCharacter();
+  else {
+    stage.applyTint(config.tint);
+    stage.expression = config.expression;
+    if (config.move !== stage.move) stage.playMove(config.move);
+  }
 }
 
 // ---------- panel ----------
@@ -51,109 +79,76 @@ function chip(label, active, onClick) {
   return b;
 }
 
-function swatches(section) {
-  const row = document.createElement('div');
-  row.className = 'swatches';
-  const current = config[section.colorKey];
-  for (const color of section.palette) {
-    const b = document.createElement('button');
-    b.className = 'swatch' + (color.toLowerCase() === current.toLowerCase() ? ' active' : '');
-    b.style.background = color;
-    b.title = color;
-    b.setAttribute('aria-label', `${section.title} colour ${color}`);
-    b.onclick = () => update({ ...config, [section.colorKey]: color });
-    row.append(b);
-  }
-  const custom = document.createElement('label');
-  custom.className = 'swatch custom' + (section.palette.includes(current) ? '' : ' active');
-  custom.title = 'Custom colour';
-  const input = document.createElement('input');
-  input.type = 'color';
-  input.value = current;
-  input.setAttribute('aria-label', `Custom ${section.title} colour`);
-  input.onchange = () => update({ ...config, [section.colorKey]: input.value });
-  custom.append(input);
-  row.append(custom);
-  return row;
-}
-
-function outfitPicker() {
+function section(title, ...children) {
   const box = document.createElement('section');
-  box.className = 'option outfits';
+  box.className = 'option';
   const h = document.createElement('h3');
-  h.textContent = 'Quick outfits';
-  const row = document.createElement('div');
-  row.className = 'chips';
-  for (const o of OUTFITS) {
-    const worn = Object.entries(o.set).every(([k, v]) => config[k] === v);
-    row.append(chip(o.name, worn, () => update({ ...config, ...o.set })));
-  }
-  box.append(h, row);
+  h.textContent = title;
+  box.append(h, ...children);
   return box;
 }
 
+function row(className, items) {
+  const r = document.createElement('div');
+  r.className = className;
+  r.append(...items);
+  return r;
+}
+
 function render() {
-  const tabs = $('#tabs');
-  tabs.replaceChildren(...TABS.map(([id, label]) => {
-    const b = chip(label, id === tab, () => { tab = id; render(); });
-    b.className = 'tab' + (id === tab ? ' active' : '');
-    b.setAttribute('role', 'tab');
+  document.querySelectorAll('.preset').forEach((b) => b.classList.toggle('active', b.dataset.id === config.person));
+
+  const person = PEOPLE.find((p) => p.id === config.person);
+  const outfits = row('chips', person.outfits.map((o) => chip(OUTFITS[o], config.outfit === o, () => update({ outfit: o }))));
+
+  const tints = row('swatches', TINTS.map(([hex, label]) => {
+    const b = document.createElement('button');
+    b.className = 'swatch' + (config.tint === hex ? ' active' : '') + (hex ? '' : ' original');
+    if (hex) b.style.background = hex;
+    b.title = label;
+    b.setAttribute('aria-label', `Outfit colour: ${label}`);
+    b.onclick = () => update({ tint: hex });
     return b;
   }));
 
-  const body = $('#options');
-  body.replaceChildren();
-  if (tab === 'clothes') body.append(outfitPicker());
-  for (const s of SECTIONS.filter((x) => x.tab === tab && (!x.when || x.when(config)))) {
-    const box = document.createElement('section');
-    box.className = 'option';
-    const h = document.createElement('h3');
-    h.textContent = s.title;
-    box.append(h);
-    for (const [label, options] of s.groups ?? [[null, s.options ?? []]]) {
-      if (!s.key) break;
-      if (label) {
-        const sub = document.createElement('div');
-        sub.className = 'group-label';
-        sub.textContent = label;
-        box.append(sub);
-      }
-      const row = document.createElement('div');
-      row.className = 'chips';
-      for (const [id, text] of options) row.append(chip(text, config[s.key] === id, () => update({ ...config, [s.key]: id })));
-      box.append(row);
-    }
-    const hideColour = s.key && ['none', 'bald', 'barefoot'].includes(config[s.key]);
-    if (s.colorKey && !hideColour) box.append(swatches(s));
-    body.append(box);
-  }
-  $('#undo').disabled = undoStack.length === 0;
+  const faces = row('chips', Object.keys(EXPRESSIONS).map((e) => chip(e, config.expression === e, () => update({ expression: e }))));
+
+  $('#options').replaceChildren(
+    section('Outfit', outfits),
+    section('Outfit colour', tints),
+    section('Expression', faces),
+  );
 }
 
 function renderPresets() {
-  const grid = $('#presets');
-  let thumbs = [];
-  try {
-    thumbs = renderThumbnails(PRESETS.map((p) => p.config));
-  } catch (e) {
-    console.warn('Thumbnails unavailable', e);
-  }
-  PRESETS.forEach((p, i) => {
+  $('#presets').replaceChildren(...PEOPLE.map((p) => {
     const b = document.createElement('button');
     b.className = 'preset';
-    b.title = `Start from ${p.name}`;
-    if (thumbs[i]) {
-      const img = document.createElement('img');
-      img.src = thumbs[i];
-      img.alt = '';
-      b.append(img);
-    }
+    b.dataset.id = p.id;
+    b.title = `${p.name}, ${p.about}`;
+    const img = document.createElement('img');
+    img.src = thumbUrl(p.id);
+    img.alt = '';
     const name = document.createElement('span');
     name.textContent = p.name;
-    b.append(name);
-    b.onclick = () => update({ ...p.config });
-    grid.append(b);
-  });
+    b.append(img, name);
+    b.onclick = () => update({ person: p.id, outfit: p.outfits.includes(config.outfit) ? config.outfit : p.outfits[0] });
+    return b;
+  }));
+}
+
+function renderMoves() {
+  $('#poses').replaceChildren(...stage.moves.map((m) => {
+    const b = document.createElement('button');
+    b.textContent = m;
+    b.dataset.pose = m;
+    b.classList.toggle('active', m === stage.move);
+    b.onclick = () => {
+      update({ move: m });
+      document.querySelectorAll('[data-pose]').forEach((x) => x.classList.toggle('active', x === b));
+    };
+    return b;
+  }));
 }
 
 // ---------- toolbar ----------
@@ -163,22 +158,27 @@ function toast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => t.classList.remove('show'), 2200);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
 }
 
-$('#random').onclick = () => update(randomConfig());
-$('#undo').onclick = () => undoStack.length && update(undoStack.pop(), { record: false });
+$('#random').onclick = () => {
+  const p = PEOPLE[Math.floor(Math.random() * PEOPLE.length)];
+  const pick = (list) => list[Math.floor(Math.random() * list.length)];
+  update({
+    person: p.id, outfit: pick(p.outfits), tint: pick(TINTS)[0],
+    expression: pick(Object.keys(EXPRESSIONS)), move: pick(stage.moves.length ? stage.moves : ['Idle']),
+  });
+};
 $('#share').onclick = async () => {
   const url = `${location.origin}${location.pathname}#a=${btoa(JSON.stringify(config))}`;
   window.history.replaceState(null, '', url);
   try {
     await navigator.clipboard.writeText(url);
-    toast('Link copied: anyone who opens it sees this avatar');
+    toast('Link copied: anyone who opens it sees this character');
   } catch {
     toast('Link is in the address bar: copy it from there');
   }
 };
-// ---------- export menu ----------
 
 const menu = $('#export-menu');
 const exportBtn = $('#export');
@@ -190,14 +190,16 @@ for (const [id, label, about] of FORMATS) {
   const item = document.createElement('button');
   item.setAttribute('role', 'menuitem');
   item.className = 'menu-item';
-  item.innerHTML = `<strong></strong><span></span>`;
-  item.querySelector('strong').textContent = label;
-  item.querySelector('span').textContent = about;
+  const strong = document.createElement('strong');
+  strong.textContent = label;
+  const span = document.createElement('span');
+  span.textContent = about;
+  item.append(strong, span);
   item.onclick = async () => {
     toggleMenu(false);
     toast(`Preparing ${label}…`);
     try {
-      await exportAvatar(stage, id);
+      await exportAvatar(stage, id, `${config.person}-${config.outfit}`);
       toast(`${label} downloaded`);
     } catch (e) {
       console.error(e);
@@ -213,19 +215,6 @@ exportBtn.onclick = (e) => {
 document.addEventListener('click', (e) => !menu.contains(e.target) && toggleMenu(false));
 document.addEventListener('keydown', (e) => e.key === 'Escape' && toggleMenu(false));
 
-// ---------- poses ----------
-
-for (const [id, label] of POSES) {
-  const b = document.createElement('button');
-  b.textContent = label;
-  b.dataset.pose = id;
-  b.classList.toggle('active', id === stage.pose);
-  b.onclick = () => {
-    stage.pose = id;
-    document.querySelectorAll('[data-pose]').forEach((x) => x.classList.toggle('active', x === b));
-  };
-  $('#poses').append(b);
-}
 $('#spin').onclick = () => {
   stage.controls.autoRotate = !stage.controls.autoRotate;
   $('#spin').classList.toggle('active', stage.controls.autoRotate);
@@ -233,13 +222,6 @@ $('#spin').onclick = () => {
 $('#recenter').onclick = () => stage.resetCamera();
 $('#closeup').onclick = () => stage.closeUp();
 
-window.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && undoStack.length) {
-    e.preventDefault();
-    update(undoStack.pop(), { record: false });
-  }
-});
-
-stage.setAvatar(config);
-render();
 renderPresets();
+render();
+showCharacter();

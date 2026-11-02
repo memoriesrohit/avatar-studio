@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Avatar Studio</title>
-  <meta name="description" content="Create and dress up your own 3D avatar in the browser.">
+  <meta name="description" content="Realistic, rigged 3D characters you can dress, animate and export.">
   <link rel="stylesheet" href="css/style.css">
   <script type="importmap">
     {
@@ -19,8 +19,7 @@
   <header class="topbar">
     <div class="brand"><span class="logo" aria-hidden="true">◆</span> Avatar Studio</div>
     <nav class="actions">
-      <button id="random" title="Random avatar">🎲 <span>Randomize</span></button>
-      <button id="undo" title="Undo (Ctrl+Z)">↶ <span>Undo</span></button>
+      <button id="random" title="Random character">🎲 <span>Randomize</span></button>
       <button id="share" title="Copy a link to this avatar">🔗 <span>Share</span></button>
       <div class="export">
         <button id="export" class="primary" aria-haspopup="menu" aria-expanded="false" title="Download as a 3D file or picture">⬇ <span>Export</span></button>
@@ -41,13 +40,16 @@
         <button id="recenter" title="Full body view">⌖</button>
       </div>
       <p class="hint">Drag to rotate · scroll to zoom</p>
+      <div id="loading" class="loading" hidden>
+        <p id="loading-text">Loading…</p>
+        <div class="bar"><div id="loading-bar"></div></div>
+      </div>
     </section>
 
     <aside class="panel">
-      <h2>Choose an avatar</h2>
+      <h2>Choose a person</h2>
       <div id="presets" class="presets"></div>
       <h2>Customize</h2>
-      <div id="tabs" class="tabs" role="tablist"></div>
       <div id="options"></div>
     </aside>
   </main>
