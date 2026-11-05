@@ -1,23 +1,325 @@
 {
-  "packs": ["downloads/makehuman_system_assets_cc0.zip", "downloads/suits01_cc0.zip"],
-  "people": {
-    "arjun": {"macros": {"proportions": 0.8, "gender": 1, "age": 0.53, "muscle": 0.78, "weight": 0.52, "height": 0.62, "race": {"asian": 0.45, "caucasian": 0.4, "african": 0.15}},
-              "skin": "young_asian_male", "skin_tint": [0.5, 0.31, 0.2], "hair_tint": [0.12, 0.1, 0.09], "eyebrows": "eyebrow002", "hair": "short02", "face_units": "asian",
-              "outfits": {"formal": ["male_elegantsuit01", "shoes03"], "smart": ["male_casualsuit05", "shoes05"], "casual": ["male_casualsuit06", "shoes06"]}},
-    "vikram": {"macros": {"proportions": 0.8, "gender": 1, "age": 0.62, "muscle": 0.55, "weight": 0.62, "height": 0.55, "race": {"asian": 0.4, "caucasian": 0.45, "african": 0.15}},
-               "skin": "middleage_asian_male", "skin_tint": [0.46, 0.29, 0.19], "hair_tint": [0.16, 0.14, 0.13], "eyebrows": "eyebrow007", "hair": "short04", "face_units": "asian",
-               "outfits": {"formal": ["toigo_male_suit_tie_and_jacket", "shoes03"], "smart": ["male_casualsuit01", "shoes01"], "casual": ["male_casualsuit02", "shoes02"]}},
-    "daniel": {"macros": {"proportions": 0.8, "gender": 1, "age": 0.55, "muscle": 0.6, "weight": 0.45, "height": 0.68, "race": {"asian": 0.0, "caucasian": 1.0, "african": 0.0}},
-               "skin": "young_caucasian_male2", "skin_tint": [0.86, 0.7, 0.6], "hair_tint": [0.55, 0.42, 0.32], "eyebrows": "eyebrow001", "hair": "short01", "face_units": "caucasian",
-               "outfits": {"formal": ["toigo_male_suit_3", "shoes03"], "smart": ["male_casualsuit03", "shoes03"], "casual": ["male_casualsuit04", "shoes02"]}},
-    "marcus": {"macros": {"proportions": 0.8, "gender": 1, "age": 0.5, "muscle": 0.9, "weight": 0.55, "height": 0.7, "race": {"asian": 0.0, "caucasian": 0.1, "african": 0.9}},
-               "skin": "young_african_male", "hair_tint": [0.1, 0.08, 0.07], "eyebrows": "eyebrow003", "hair": "short01", "face_units": "african",
-               "outfits": {"formal": ["toigo_male_double-breasted_suit", "shoes03"], "smart": ["male_casualsuit05", "shoes05"], "casual": ["male_casualsuit06", "shoes06"]}},
-    "meera": {"macros": {"proportions": 0.8, "gender": 0, "age": 0.52, "muscle": 0.5, "weight": 0.45, "height": 0.45, "race": {"asian": 0.5, "caucasian": 0.4, "african": 0.1}},
-              "skin": "young_asian_female", "skin_tint": [0.62, 0.42, 0.3], "hair_tint": [0.1, 0.08, 0.07], "eyebrows": "eyebrow010", "hair": "long01", "face_units": "asian",
-              "outfits": {"formal": ["toigo_female_suit", "shoes01"], "smart": ["female_elegantsuit01", "shoes01"], "casual": ["female_casualsuit01", "shoes03"]}},
-    "sarah": {"macros": {"proportions": 0.8, "gender": 0, "age": 0.58, "muscle": 0.5, "weight": 0.5, "height": 0.55, "race": {"asian": 0.0, "caucasian": 1.0, "african": 0.0}},
-              "skin": "young_caucasian_female", "skin_tint": [0.9, 0.74, 0.64], "hair_tint": [0.62, 0.45, 0.28], "eyebrows": "eyebrow011", "hair": "bob02", "face_units": "caucasian",
-              "outfits": {"formal": ["toigo_female_double-breasted_suit", "shoes01"], "smart": ["female_elegantsuit01", "shoes04"], "casual": ["female_casualsuit02", "shoes04"]}}
-  }
+    "packs":  [
+                  "downloads/makehuman_system_assets_cc0.zip",
+                  "downloads/suits01_cc0.zip"
+              ],
+    "people":  {
+                   "arjun":  {
+                                 "macros":  {
+                                                "proportions":  0.8,
+                                                "gender":  1,
+                                                "age":  0.53,
+                                                "muscle":  0.78,
+                                                "weight":  0.52,
+                                                "height":  0.62,
+                                                "race":  {
+                                                             "asian":  0.45,
+                                                             "caucasian":  0.4,
+                                                             "african":  0.15
+                                                         }
+                                            },
+                                 "skin":  "young_asian_male",
+                                 "skin_tint":  [
+                                                   0.5,
+                                                   0.31,
+                                                   0.2
+                                               ],
+                                 "hair_tint":  [
+                                                   0.12,
+                                                   0.1,
+                                                   0.09
+                                               ],
+                                 "eyebrows":  "eyebrow004",
+                                 "hair":  "short02",
+                                 "face_units":  "asian",
+                                 "outfits":  {
+                                                 "formal":  [
+                                                                "male_elegantsuit01",
+                                                                "shoes03"
+                                                            ],
+                                                 "smart":  [
+                                                               "male_casualsuit05",
+                                                               "shoes05"
+                                                           ],
+                                                 "casual":  [
+                                                                "male_casualsuit06",
+                                                                "shoes06"
+                                                            ]
+                                             },
+                                 "targets":  {
+                                                 "chin-prominent-incr":  0.56,
+                                                 "chin-width-incr":  0.42,
+                                                 "l-cheek-bones-incr":  0.56,
+                                                 "r-cheek-bones-incr":  0.56,
+                                                 "head-square":  0.42,
+                                                 "nose-hump-incr":  0.28,
+                                                 "mouth-laugh-lines-in":  0.42,
+                                                 "eyebrows-trans-down":  0.28,
+                                                 "neck-scale-horiz-incr":  0.42
+                                             },
+                                 "eye_texture":  "brownlight_natural_eye.png"
+                             },
+                   "vikram":  {
+                                  "macros":  {
+                                                 "proportions":  0.8,
+                                                 "gender":  1,
+                                                 "age":  0.62,
+                                                 "muscle":  0.55,
+                                                 "weight":  0.62,
+                                                 "height":  0.55,
+                                                 "race":  {
+                                                              "asian":  0.4,
+                                                              "caucasian":  0.45,
+                                                              "african":  0.15
+                                                          }
+                                             },
+                                  "skin":  "middleage_asian_male",
+                                  "skin_tint":  [
+                                                    0.46,
+                                                    0.29,
+                                                    0.19
+                                                ],
+                                  "hair_tint":  [
+                                                    0.16,
+                                                    0.14,
+                                                    0.13
+                                                ],
+                                  "eyebrows":  "eyebrow008",
+                                  "hair":  "short04",
+                                  "face_units":  "asian",
+                                  "outfits":  {
+                                                  "formal":  [
+                                                                 "toigo_male_suit_tie_and_jacket",
+                                                                 "shoes03"
+                                                             ],
+                                                  "smart":  [
+                                                                "male_casualsuit01",
+                                                                "shoes01"
+                                                            ],
+                                                  "casual":  [
+                                                                 "male_casualsuit02",
+                                                                 "shoes02"
+                                                             ]
+                                              },
+                                  "targets":  {
+                                                  "head-age-incr":  0.49,
+                                                  "head-fat-incr":  0.35,
+                                                  "chin-width-incr":  0.56,
+                                                  "nose-volume-incr":  0.42,
+                                                  "nose-flaring-incr":  0.42,
+                                                  "mouth-laugh-lines-in":  0.7,
+                                                  "neck-double-incr":  0.28,
+                                                  "head-rectangular":  0.42
+                                              },
+                                  "eye_texture":  "brownlight_natural_eye.png"
+                              },
+                   "daniel":  {
+                                  "macros":  {
+                                                 "proportions":  0.8,
+                                                 "gender":  1,
+                                                 "age":  0.55,
+                                                 "muscle":  0.6,
+                                                 "weight":  0.45,
+                                                 "height":  0.68,
+                                                 "race":  {
+                                                              "asian":  0.0,
+                                                              "caucasian":  1.0,
+                                                              "african":  0.0
+                                                          }
+                                             },
+                                  "skin":  "young_caucasian_male2",
+                                  "skin_tint":  [
+                                                    0.86,
+                                                    0.7,
+                                                    0.6
+                                                ],
+                                  "hair_tint":  [
+                                                    0.55,
+                                                    0.42,
+                                                    0.32
+                                                ],
+                                  "eyebrows":  "eyebrow001",
+                                  "hair":  "short01",
+                                  "face_units":  "caucasian",
+                                  "outfits":  {
+                                                  "formal":  [
+                                                                 "toigo_male_suit_3",
+                                                                 "shoes03"
+                                                             ],
+                                                  "smart":  [
+                                                                "male_casualsuit03",
+                                                                "shoes03"
+                                                            ],
+                                                  "casual":  [
+                                                                 "male_casualsuit04",
+                                                                 "shoes02"
+                                                             ]
+                                              },
+                                  "targets":  {
+                                                  "head-oval":  0.56,
+                                                  "chin-cleft-incr":  0.7,
+                                                  "nose-greek-incr":  0.42,
+                                                  "l-cheek-bones-incr":  0.42,
+                                                  "r-cheek-bones-incr":  0.42,
+                                                  "chin-prominent-incr":  0.42,
+                                                  "mouth-laugh-lines-in":  0.28
+                                              },
+                                  "eye_texture":  "blue_natural_eye.png"
+                              },
+                   "marcus":  {
+                                  "macros":  {
+                                                 "proportions":  0.8,
+                                                 "gender":  1,
+                                                 "age":  0.5,
+                                                 "muscle":  0.9,
+                                                 "weight":  0.55,
+                                                 "height":  0.7,
+                                                 "race":  {
+                                                              "asian":  0.0,
+                                                              "caucasian":  0.1,
+                                                              "african":  0.9
+                                                          }
+                                             },
+                                  "skin":  "young_african_male",
+                                  "hair_tint":  [
+                                                    0.1,
+                                                    0.08,
+                                                    0.07
+                                                ],
+                                  "eyebrows":  "eyebrow012",
+                                  "hair":  "short01",
+                                  "face_units":  "african",
+                                  "outfits":  {
+                                                  "formal":  [
+                                                                 "toigo_male_double-breasted_suit",
+                                                                 "shoes03"
+                                                             ],
+                                                  "smart":  [
+                                                                "male_casualsuit05",
+                                                                "shoes05"
+                                                            ],
+                                                  "casual":  [
+                                                                 "male_casualsuit06",
+                                                                 "shoes06"
+                                                             ]
+                                              },
+                                  "targets":  {
+                                                  "head-square":  0.56,
+                                                  "chin-width-incr":  0.7,
+                                                  "nose-flaring-incr":  0.56,
+                                                  "nose-width2-incr":  0.42,
+                                                  "mouth-lowerlip-volume-incr":  0.42,
+                                                  "neck-scale-horiz-incr":  0.7,
+                                                  "l-cheek-bones-incr":  0.42,
+                                                  "r-cheek-bones-incr":  0.42
+                                              },
+                                  "eye_texture":  "brownlight_natural_eye.png"
+                              },
+                   "meera":  {
+                                 "macros":  {
+                                                "proportions":  0.8,
+                                                "gender":  0,
+                                                "age":  0.52,
+                                                "muscle":  0.5,
+                                                "weight":  0.45,
+                                                "height":  0.45,
+                                                "race":  {
+                                                             "asian":  0.5,
+                                                             "caucasian":  0.4,
+                                                             "african":  0.1
+                                                         }
+                                            },
+                                 "skin":  "young_asian_female",
+                                 "skin_tint":  [
+                                                   0.62,
+                                                   0.42,
+                                                   0.3
+                                               ],
+                                 "hair_tint":  [
+                                                   0.1,
+                                                   0.08,
+                                                   0.07
+                                               ],
+                                 "eyebrows":  "eyebrow002",
+                                 "hair":  "long01",
+                                 "face_units":  "asian",
+                                 "outfits":  {
+                                                 "formal":  [
+                                                                "toigo_female_suit",
+                                                                "shoes01"
+                                                            ],
+                                                 "smart":  [
+                                                               "female_elegantsuit01",
+                                                               "shoes01"
+                                                           ],
+                                                 "casual":  [
+                                                                "female_casualsuit01",
+                                                                "shoes03"
+                                                            ]
+                                             },
+                                 "targets":  {
+                                                 "head-oval":  0.4,
+                                                 "chin-triangle":  0.3,
+                                                 "mouth-upperlip-volume-incr":  0.3,
+                                                 "mouth-lowerlip-volume-incr":  0.3,
+                                                 "nose-point-width-decr":  0.3,
+                                                 "l-cheek-bones-incr":  0.2,
+                                                 "r-cheek-bones-incr":  0.2,
+                                                 "eyebrows-angle-up":  0.2
+                                             },
+                                 "eye_texture":  "brownlight_natural_eye.png"
+                             },
+                   "sarah":  {
+                                 "macros":  {
+                                                "proportions":  0.8,
+                                                "gender":  0,
+                                                "age":  0.58,
+                                                "muscle":  0.5,
+                                                "weight":  0.5,
+                                                "height":  0.55,
+                                                "race":  {
+                                                             "asian":  0.0,
+                                                             "caucasian":  1.0,
+                                                             "african":  0.0
+                                                         }
+                                            },
+                                 "skin":  "young_caucasian_female",
+                                 "skin_tint":  [
+                                                   0.9,
+                                                   0.74,
+                                                   0.64
+                                               ],
+                                 "hair_tint":  [
+                                                   0.62,
+                                                   0.45,
+                                                   0.28
+                                               ],
+                                 "eyebrows":  "eyebrow011",
+                                 "hair":  "bob02",
+                                 "face_units":  "caucasian",
+                                 "outfits":  {
+                                                 "formal":  [
+                                                                "toigo_female_double-breasted_suit",
+                                                                "shoes01"
+                                                            ],
+                                                 "smart":  [
+                                                               "female_elegantsuit01",
+                                                               "shoes04"
+                                                           ],
+                                                 "casual":  [
+                                                                "female_casualsuit02",
+                                                                "shoes04"
+                                                            ]
+                                             },
+                                 "targets":  {
+                                                 "head-diamond":  0.3,
+                                                 "l-cheek-bones-incr":  0.4,
+                                                 "r-cheek-bones-incr":  0.4,
+                                                 "nose-scale-horiz-decr":  0.2,
+                                                 "mouth-lowerlip-volume-incr":  0.3,
+                                                 "chin-prominent-incr":  0.2
+                                             },
+                                 "eye_texture":  "green_natural_eye.png"
+                             }
+               }
 }

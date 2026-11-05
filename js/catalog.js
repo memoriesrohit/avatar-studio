@@ -54,8 +54,8 @@ export const EXPRESSIONS = {
 
 // The face each move starts with (you can still pick another expression afterwards).
 export const MOVE_EXPRESSION = {
-  Idle: 'Neutral', Walk: 'Confident', Wave: 'Smile', Talk: 'Smile', Shrug: 'Confident', Happy: 'Excited',
-  Laugh: 'Big laugh', Stretch: 'Neutral', Boxing: 'Serious', Salsa: 'Smile', Charleston: 'Big laugh',
+  Idle: 'Neutral', Walk: 'Confident', Wave: 'Smile', Talk: 'Smile', Argue: 'Angry', Happy: 'Excited',
+  Laugh: 'Big laugh', Drink: 'Neutral', Boxing: 'Serious',
 };
 
 export const DEFAULT ={ person: 'arjun', outfit: 'formal', tint: null, expression: 'Neutral', move: 'Idle' };

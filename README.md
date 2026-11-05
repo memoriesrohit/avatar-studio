@@ -6,11 +6,12 @@
 
 ## What you get
 
-- **6 realistic people:** Arjun, Vikram, Daniel, Marcus, Meera and Sarah, each with their own body, face, skin tone and hair
+- **6 realistic people:** Arjun, Vikram, Daniel, Marcus, Meera and Sarah, each with their own body, sculpted facial structure (jaw, cheekbones, chin, nose, lips, laugh lines), skin tone, natural eye colour, eyebrows and hair
 - **3 outfits each:** office formal (suit and tie), smart casual and casual, with fitted shirts, jackets, jeans and shoes
 - **Outfit colours:** recolour the clothes while keeping the fabric detail
 - **10 facial expressions:** neutral, smile, big laugh, excited, confident, serious, surprised, angry, sad and wink. These are real face shapes, and the eyelids, brows, lashes, teeth and tongue move with them. Characters also blink naturally.
-- **11 motion-captured moves:** idle, walk, wave, talk, shrug, happy, laugh, stretch, boxing, salsa and Charleston. These are **real recorded human movement** from the CMU motion-capture library, retargeted onto each character, so weight shifts, arm swing and timing look natural. Each move starts with a fitting expression, such as a laugh for Laugh.
+- **9 motion-captured moves:** idle, walk, wave, talk, argue, happy, laugh, drink and boxing. These are **real recorded human movement** (male performers) from the CMU motion-capture library, retargeted onto each character, smoothed to remove capture jitter, with the feet kept on the floor and the body facing you. Each move starts with a fitting expression, such as a laugh for Laugh.
+- **Skin and eyes:** fine skin-pore detail for light to catch, and natural iris colours with clean whites
 - **Lifelike behaviour:** during calm moves the character turns their head to keep eye contact with you
 - **Studio rendering:** lit by a photographed studio environment, with soft shadows, ambient occlusion in folds and contact points, and a gentle sheen on skin and fabric
 - **Face close-up**, auto-rotate, randomize and share links
@@ -19,7 +20,7 @@
 
 | Format | What you get | Use it in |
 |---|---|---|
-| **GLB** | Skinned character on a **Mixamo-compatible skeleton**, all 11 moves as animation clips, all face shapes, with your outfit colour and expression | Blender, Unity, Unreal, Godot, Mixamo |
+| **GLB** | Skinned character on a **Mixamo-compatible skeleton**, all 9 moves as animation clips, all face shapes, with your outfit colour and expression | Blender, Unity, Unreal, Godot, Mixamo |
 | **glTF** | Same as GLB, as a readable JSON file | Same as GLB |
 | **OBJ** | Shape only, standing pose | Almost any 3D app |
 | **STL** | Shape only | 3D printing |
@@ -57,11 +58,13 @@ tools/                 the Blender scripts that build models/, and the motion-ca
 
 The build script (`tools/build.py`) does this for each person and outfit:
 
-1. Creates a MakeHuman body from macro settings (gender, age, muscle, weight, height, ethnicity).
-2. Adds a skin, eyes, eyebrows, eyelashes, teeth, tongue, hair, clothes and shoes, all fitted to that body, and smooths the body and clothes with one level of subdivision.
+1. Creates a MakeHuman body from macro settings (gender, age, muscle, weight, height, proportions, ethnicity), then shapes the face with MakeHuman's detail targets (jaw, chin, cheekbones, nose, lips, laugh lines; listed per person in `tools/people.json`).
+2. Adds a skin, eyes (with natural iris textures made by `tools/make_eyes.py`), eyebrows, eyelashes, teeth, tongue, hair, clothes and shoes, all fitted to that body, and smooths the body and clothes with one level of subdivision.
 3. Adds a Mixamo-compatible skeleton.
 4. Adds MakeHuman's **34 face units** (eye closure, brow raise, smile, jaw open, …) as shape keys on the face, then refits the brows, lashes, teeth and tongue for each unit so they follow it.
-5. Retargets the motion-capture clips listed in `tools/moves.json` (`tools/mocap.py`). It reads CMU's skeleton and motion files, puts the character in the performer's T-pose, then copies every joint's rotation frame by frame, so arm, leg, spine and head movement keep their twist and timing. Hip height is scaled to the character's legs, travel across the floor is removed so moves play in place, and each clip is trimmed and blended so it loops without a jump.
+5. Retargets the motion-capture clips listed in `tools/moves.json` (`tools/mocap.py`). It reads CMU's skeleton and motion files, puts the character in the performer's T-pose, then copies every joint's rotation frame by frame, so arm, leg, spine and head movement keep their twist and timing. Hip height is scaled to the character's legs, the lowest heel or toe is kept on the floor every frame, capture jitter is filtered out, facing comes from the performer's hip and shoulder lines with slow turning removed (so the character keeps facing you), travel across the floor is removed so moves play in place, and each clip is trimmed and blended so it loops without a jump.
+
+To check a retarget, set `AVATAR_VERIFY=1` before building: every move is rendered next to the performer's own skeleton (as a stick figure), from the front and the side, and the torso lean of both is logged. `tools/verifysheet.py` turns the renders into one sheet per move.
 6. Exports a GLB with 2048 px WebP textures and sparse morph targets.
 
 Expressions are recipes of those face units (see `EXPRESSIONS` in `js/catalog.js`), so adding a new one takes no 3D work.

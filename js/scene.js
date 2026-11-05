@@ -15,7 +15,7 @@ import { EXPRESSIONS } from './catalog.js';
 const BLINK_UNITS = ['eye-left-closure', 'eye-right-closure'];
 const NOT_CLOTHES = /^(Body|Eyes|Eyebrows|Eyelashes|Teeth|Tongue|Hair)/;
 // moves calm enough for the character to hold eye contact with the viewer
-const EYE_CONTACT = new Set(['Idle', 'Talk', 'Wave', 'Shrug', 'Happy']);
+const EYE_CONTACT = new Set(['Idle', 'Talk', 'Wave', 'Argue', 'Happy']);
 
 function setupLights(scene) {
   const key = new THREE.DirectionalLight(0xfff1e0, 1.6);
@@ -40,6 +40,46 @@ const meshLabel = (o) => (o.name && !/^mesh_\d|_\d+$/.test(o.name) ? o.name : o.
  * Hair, brows and lashes become cut-out strands; everything else is solid. The eyes keep their
  * transparent outer layer (cornea).
  */
+/**
+ * Fine skin-surface detail (pores and micro creases) as a small tiling normal map, generated once.
+ * MakeHuman skins only have a colour texture, so without this skin reads as smooth plastic.
+ */
+let poreMap;
+function skinDetail() {
+  if (poreMap) return poreMap;
+  const N = 256;
+  const h = new Float32Array(N * N);
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 2600; i++) { // pores: small soft dimples
+    const cx = rand() * N, cy = rand() * N, r = 0.8 + rand() * 1.6, d = 0.4 + rand() * 0.6;
+    for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) {
+      const px = (Math.floor(cx) + x + N) % N, py = (Math.floor(cy) + y + N) % N;
+      const dist = Math.hypot(x + (cx % 1) - 0.5, y + (cy % 1) - 0.5);
+      if (dist < r * 2) h[py * N + px] -= d * Math.exp(-(dist * dist) / (r * r));
+    }
+  }
+  for (let i = 0; i < N * N; i++) h[i] += (rand() - 0.5) * 0.25; // fine grain
+  const img = new Uint8ClampedArray(N * N * 4);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const at = (xx, yy) => h[((yy + N) % N) * N + ((xx + N) % N)];
+    const dx = at(x + 1, y) - at(x - 1, y), dy = at(x, y + 1) - at(x, y - 1);
+    const n = new THREE.Vector3(-dx, -dy, 2).normalize();
+    const i = (y * N + x) * 4;
+    img[i] = (n.x * 0.5 + 0.5) * 255;
+    img[i + 1] = (n.y * 0.5 + 0.5) * 255;
+    img[i + 2] = (n.z * 0.5 + 0.5) * 255;
+    img[i + 3] = 255;
+  }
+  poreMap = new THREE.DataTexture(img, N, N, THREE.RGBAFormat);
+  poreMap.wrapS = poreMap.wrapT = THREE.RepeatWrapping;
+  poreMap.repeat.set(24, 24);
+  poreMap.generateMipmaps = true;
+  poreMap.minFilter = THREE.LinearMipmapLinearFilter;
+  poreMap.needsUpdate = true;
+  return poreMap;
+}
+
 function fixMaterial(o) {
   const label = meshLabel(o);
   const src = o.material;
@@ -58,7 +98,8 @@ function fixMaterial(o) {
     // the eye texture's clear part is the cornea in front of the iris
     Object.assign(m, { alphaTest: 0.5, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03 });
   } else if (/^Body/.test(label)) {
-    Object.assign(m, { roughness: 0.52, sheen: 0.3, sheenRoughness: 0.75, specularIntensity: 0.45 });
+    Object.assign(m, { roughness: 0.5, sheen: 0.3, sheenRoughness: 0.75, specularIntensity: 0.5, normalMap: skinDetail() });
+    m.normalScale.set(0.35, 0.35);
     m.sheenColor.set(0xff9e86);
   } else if (/^(Teeth|Tongue)/.test(label)) {
     Object.assign(m, { roughness: 0.35, clearcoat: 0.4 });

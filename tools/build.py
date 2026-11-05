@@ -91,6 +91,19 @@ def obj_name(o):
     return o.name
 
 
+def set_eye_texture(eyes, path):
+    """Swap the iris/sclera image of the eye material for one of our natural eye textures."""
+    img = bpy.data.images.load(path, check_existing=True)
+    swapped = 0
+    for slot in eyes.material_slots:
+        if slot.material and slot.material.node_tree:
+            for node in slot.material.node_tree.nodes:
+                if node.type == "TEX_IMAGE" and node.image is not None and "eye" in node.image.name.lower():
+                    node.image = img
+                    swapped += 1
+    log("eyes", os.path.basename(path), "swapped", swapped)
+
+
 def tint_skin(human, rgb):
     """Multiply the skin texture by a colour (exports as glTF baseColorFactor)."""
     for slot in human.material_slots:
@@ -172,7 +185,9 @@ def render_preview(path, focus="body"):
     scene.collection.objects.link(cam)
     scene.camera = cam
     if focus == "face":
-        cam.location = (0.0, -0.75, 1.62)
+        rig = next(o for o in bpy.data.objects if o.type == "ARMATURE")
+        z = (rig.matrix_world @ rig.pose.bones["mixamorig:Head"].head).z + 0.09
+        cam.location = (0.0, -0.75, z)
         cam.data.lens = 85
     elif focus == "bust":
         head = next(o for o in bpy.data.objects if o.type == "ARMATURE").pose.bones["mixamorig:Head"]
@@ -208,6 +223,7 @@ def bake_mocap(arm, spec):
     """Retarget each motion-capture clip in moves.json onto the character's skeleton."""
     moves = json.load(open(os.path.join(HERE, "moves.json"), encoding="utf-8-sig"))
     only = [m for m in os.environ.get("AVATAR_MOVES", "").split(",") if m]
+    clips = {}
     for m in moves:
         if only and m["name"] not in only:
             continue
@@ -218,7 +234,94 @@ def bake_mocap(arm, spec):
             a, b = mocap.best_loop(clip, int(m["loop"][0] * mocap.FPS), int(m["loop"][1] * mocap.FPS))
             clip.trim(a, b)
         mocap.retarget(arm, clip, m["name"], finger_pose=anim.relaxed_hands())
+        clips[m["name"]] = clip
         log(spec["id"], "move", m["name"], f"{len(clip) / mocap.FPS:.1f}s")
+    return clips
+
+
+def verify_moves(arm, clips, out_dir, sid, samples=4):
+    """Render each move next to the performer's own skeleton (stick figure), front and side, and
+    log how far the torso leans in each, so retargeting errors are visible and measurable."""
+    import bmesh
+    scene = bpy.context.scene
+    tracks = list(arm.animation_data.nla_tracks)
+    for t in tracks:
+        t.mute = True
+    bpy.context.view_layer.update()
+    hips_rest = arm.pose.bones["mixamorig:Hips"].bone.head_local.copy()
+    stick = bpy.data.objects.new("stick", bpy.data.meshes.new("stick"))
+    scene.collection.objects.link(stick)
+    skin = stick.modifiers.new("skin", "SKIN")
+    stick.modifiers.new("sub", "SUBSURF").levels = 1
+    mat = bpy.data.materials.new("stickmat")
+    mat.diffuse_color = (0.9, 0.8, 0.3, 1)
+    stick.data.materials.append(mat)
+    offset = Vector((0.85, 0, 0))
+    report = {}
+    for track in tracks:
+        name = track.name
+        clip = clips[name]
+        action = bpy.data.actions[name]
+        arm.animation_data.action = action
+        end = len(clip) - 1
+        leans = []
+        for k in range(samples):
+            f = int(k * end / max(1, samples - 1))
+            scene.frame_set(f)
+            pts = mocap.source_points(clip, f, hips_rest)
+            names = list(pts)
+            bm = bmesh.new()
+            layer = bm.verts.layers.skin.verify()
+            verts = {n: bm.verts.new(pts[n] + offset) for n in names}
+            for v in bm.verts:
+                v[layer].radius = (0.022, 0.022)
+            verts["root"][layer].use_root = True
+            for child, parent in clip.skel.parent.items():
+                if child in verts and parent in verts:
+                    bm.edges.new((verts[parent], verts[child]))
+            bm.to_mesh(stick.data)
+            bm.free()
+            # torso lean (degrees from vertical, + = backwards) for performer and character
+            def lean(a, b):
+                d = (b - a).normalized()
+                return math.degrees(math.atan2(d.y, d.z))  # +Y is behind the character
+            src = lean(pts["root"], pts["lowerneck"])
+            pb = arm.pose.bones
+            tgt = lean((arm.matrix_world @ pb["mixamorig:Hips"].head), (arm.matrix_world @ pb["mixamorig:Neck"].head))
+            leans.append((round(src, 1), round(tgt, 1)))
+            for view in ("front", "side"):
+                render_compare(os.path.join(out_dir, "verify", f"{sid}_{name.replace(' ', '_')}_{k}_{view}.png"), view)
+        report[name] = leans
+        log("VERIFY", name, "lean performer/character per sample:", leans)
+        arm.animation_data.action = None
+    bpy.data.objects.remove(stick, do_unlink=True)
+    for t in tracks:
+        t.mute = False
+    return report
+
+
+def render_compare(path, view):
+    scene = bpy.context.scene
+    cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
+    scene.collection.objects.link(cam)
+    scene.camera = cam
+    cam.data.lens = 40
+    if view == "front":
+        cam.location, cam.rotation_euler = (0.42, -5.2, 1.0), (math.radians(90), 0, 0)
+    else:
+        cam.location, cam.rotation_euler = (5.6, 0.0, 1.0), (math.radians(90), 0, math.radians(90))
+    sun = bpy.data.objects.new("sun", bpy.data.lights.new("sun", "SUN"))
+    sun.data.energy = 3
+    sun.rotation_euler = (math.radians(50), 0, math.radians(30))
+    scene.collection.objects.link(sun)
+    scene.world = scene.world or bpy.data.worlds.new("w")
+    scene.world.color = (0.2, 0.2, 0.22)
+    scene.render.engine = "BLENDER_EEVEE"
+    scene.render.resolution_x, scene.render.resolution_y = 420, 460
+    scene.render.filepath = path
+    bpy.ops.render.render(write_still=True)
+    bpy.data.objects.remove(cam, do_unlink=True)
+    bpy.data.objects.remove(sun, do_unlink=True)
 
 
 def render_moves(arm, out_dir, sid):
@@ -248,7 +351,11 @@ def build(spec, out_dir):
 
     # extra face/body details, e.g. a stronger jaw
     for target, weight in spec.get("targets", {}).items():
-        TargetService.set_target_value(human, target, weight)
+        path = TargetService.target_full_path(target)
+        if path:
+            TargetService.load_target(human, path, weight=weight, name=target)
+        else:
+            log("WARNING unknown face target", target)
 
     HumanService.add_builtin_rig(human, "mixamo")
     try:
@@ -276,6 +383,8 @@ def build(spec, out_dir):
                                            material_type="MAKESKIN")
         if kind in ("Eyebrows", "Eyelashes", "Teeth", "Tongue"):
             face_parts.append(obj)
+        if kind == "Eyes" and spec.get("eye_texture"):
+            set_eye_texture(obj, os.path.join(HERE, "eyes", spec["eye_texture"]))
         named.append((obj, kind if kind != "Clothes" else f"Clothes_{name}"))
 
     # bake the body shape into the mesh, then add the face units as fresh morph targets
@@ -326,8 +435,10 @@ def build(spec, out_dir):
             for k in o.data.shape_keys.key_blocks[1:]:
                 k.value = 0.0
         anim.apply_move(arm, [])
-    if spec.get("animations", True):
-        bake_mocap(arm, spec)
+    if spec.get("animations", True) and not os.environ.get("AVATAR_NOANIM"):
+        clips = bake_mocap(arm, spec)
+        if os.environ.get("AVATAR_VERIFY"):
+            verify_moves(arm, clips, out_dir, spec["id"])
         if os.environ.get("AVATAR_MOVE_PREVIEW"):
             render_moves(arm, out_dir, spec["id"])
 
