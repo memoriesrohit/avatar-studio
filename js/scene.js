@@ -10,12 +10,13 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { EXPRESSIONS } from './catalog.js';
+import { EXPRESSIONS, ARKIT_EXPRESSIONS } from './catalog.js';
 
-const BLINK_UNITS = ['eye-left-closure', 'eye-right-closure'];
+const MH_BLINK = ['eye-left-closure', 'eye-right-closure'];
+const ARKIT_BLINK = ['eyeBlinkLeft', 'eyeBlinkRight'];
 const NOT_CLOTHES = /^(Body|Eyes|Eyebrows|Eyelashes|Teeth|Tongue|Hair)/;
 // moves calm enough for the character to hold eye contact with the viewer
-const EYE_CONTACT = new Set(['Idle', 'Talk', 'Wave', 'Argue', 'Happy']);
+const EYE_CONTACT = new Set(['Idle', 'Talk', 'Wave', 'Argue', 'Happy', 'Confident', 'Cheer', 'Laugh', 'Clap', 'Shrug']);
 
 function setupLights(scene) {
   const key = new THREE.DirectionalLight(0xfff1e0, 1.6);
@@ -161,8 +162,11 @@ function fixMaterial(o) {
     // the eye texture's clear part is the cornea in front of the iris
     Object.assign(m, { alphaTest: 0.5, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03 });
   } else if (/^Body/.test(label)) {
-    Object.assign(m, { roughness: 0.5, sheen: 0.3, sheenRoughness: 0.75, specularIntensity: 0.5, normalMap: skinDetail() });
-    m.normalScale.set(0.35, 0.35);
+    // characters with their own sculpted skin detail (normal + roughness maps) keep it
+    const own = !!src.normalMap;
+    // (their head texture also carries painted scalp hair, which the pink skin sheen would redden)
+    Object.assign(m, { roughness: own && src.roughnessMap ? 1 : 0.5, sheen: own ? 0 : 0.3, sheenRoughness: 0.75, specularIntensity: own ? 0.4 : 0.5, normalMap: own ? src.normalMap : skinDetail() });
+    if (!own) m.normalScale.set(0.35, 0.35);
     m.sheenColor.set(0xff9e86);
   } else if (/^(Teeth|Tongue)/.test(label)) {
     Object.assign(m, { roughness: 0.35, clearcoat: 0.4 });
@@ -172,8 +176,9 @@ function fixMaterial(o) {
     m.normalScale.set(0.4, 0.4);
   } else {
     // fabric: matte with a soft sheen at grazing angles and a woven surface, like real cloth
-    Object.assign(m, { roughness: 0.82, roughnessMap: null, sheen: 0.6, sheenRoughness: 0.85, specularIntensity: 0.3, normalMap: src.normalMap ?? fabricDetail() });
-    m.normalScale.set(0.5, 0.5);
+    const own = !!src.normalMap;
+    Object.assign(m, { roughness: own && src.roughnessMap ? 1 : 0.82, roughnessMap: own ? src.roughnessMap : null, sheen: 0.6, sheenRoughness: 0.85, specularIntensity: 0.3, normalMap: own ? src.normalMap : fabricDetail() });
+    if (!own) m.normalScale.set(0.5, 0.5);
     m.sheenColor.copy(src.color).lerp(new THREE.Color(0xffffff), 0.5).multiplyScalar(0.5);
   }
   src.dispose();
@@ -230,8 +235,9 @@ export class Stage {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.AgXToneMapping; // natural skin tones, soft highlight roll-off
-    this.renderer.toneMappingExposure = 1.15;
+    // Khronos PBR Neutral: keeps skin, lips and fabric colours true (AgX washed skin out to grey)
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
@@ -295,8 +301,13 @@ export class Stage {
   }
 
   closeUp() {
+    // frame the face around the eyes (head bones sit at different heights in different rigs)
     const head = this.character?.getObjectByName('mixamorigHead');
-    const y = head ? head.getWorldPosition(new THREE.Vector3()).y + 0.07 : 1.6;
+    let y = head ? head.getWorldPosition(new THREE.Vector3()).y + 0.07 : 1.6;
+    if (this.eyes && head) {
+      head.updateWorldMatrix(true, false);
+      y = this.eyes.centre.clone().applyMatrix4(head.matrixWorld).y - 0.03;
+    }
     this.camera.position.set(0.16, y + 0.02, 0.75);
     this.controls.target.set(0, y, 0);
     this.controls.update();
@@ -354,6 +365,7 @@ export class Stage {
     this.applyTint(this.tint);
     this.current = {};
     this.playMove(this.move, 0);
+    this.mixer.update(0); // pose the first frame now, so the rest pose never flashes
     return gltf;
   }
 
@@ -426,19 +438,36 @@ export class Stage {
    */
   setupEyes() {
     this.eyes = null;
-    const mesh = this.character.getObjectByName('Eyes');
+    // eyes are aimed with eye bones when the rig has them (Rocketbox), else with the eye-look
+    // shapes on the Eyes mesh (MakeHuman)
+    const boneNames = ['mixamorigLeftEye', 'mixamorigRightEye'];
+    const skinned = this.morphMeshes.find((m) => m.isSkinnedMesh && boneNames.every((n) => m.skeleton.bones.some((b) => b.name === n)));
+    const mesh = skinned ?? this.morphMeshes.find((m) => m.morphTargetDictionary['eyes-look-left'] !== undefined);
     const dict = mesh?.morphTargetDictionary;
-    if (!this.head || !dict || dict['eyes-look-left'] === undefined) return;
+    if (!this.head || !mesh) return;
     const bi = mesh.skeleton.bones.indexOf(this.head);
     if (bi < 0) return;
     const inv = mesh.skeleton.boneInverses[bi]; // mesh space -> head bone space, at bind
-    mesh.geometry.computeBoundingBox();
-    const centre = mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(inv);
+    let centre;
+    const eyeBones = ['mixamorigLeftEye', 'mixamorigRightEye'].map((n) => mesh.skeleton.bones.findIndex((b) => b.name === n));
+    if (eyeBones.every((i) => i >= 0)) {
+      // midpoint of the two eye bones at bind, in the head bone's frame
+      centre = new THREE.Vector3();
+      for (const i of eyeBones) centre.add(new THREE.Vector3().setFromMatrixPosition(mesh.skeleton.boneInverses[i].clone().invert()).applyMatrix4(inv));
+      centre.multiplyScalar(0.5);
+    } else {
+      mesh.geometry.computeBoundingBox();
+      centre = mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(inv);
+    }
     const rot = new THREE.Matrix3().setFromMatrix4(inv);
     const dir = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix3(rot).normalize();
     this.eyes = {
       mesh, centre, forward: dir(0, 0, 1), left: dir(1, 0, 0), up: dir(0, 1, 0),
-      keys: ['eyes-look-left', 'eyes-look-right', 'eyes-look-up', 'eyes-look-down'].map((k) => dict[k]),
+      bones: skinned ? boneNames.map((n) => mesh.skeleton.bones.find((b) => b.name === n)) : null,
+      // eye bones the moves don't animate get their rest pose back each frame before aiming
+      restLocal: skinned ? boneNames.map((n) => mesh.skeleton.bones.find((b) => b.name === n).quaternion.clone()) : null,
+      animated: skinned && this.gltf.animations.some((c) => c.tracks.some((t) => t.name.startsWith(boneNames[0] + '.quaternion'))),
+      keys: skinned ? null : ['eyes-look-left', 'eyes-look-right', 'eyes-look-up', 'eyes-look-down'].map((k) => dict[k]),
       yaw: 0, pitch: 0, dart: new THREE.Vector2(), nextDart: 0,
     };
   }
@@ -472,6 +501,20 @@ export class Stage {
     const k = 1 - Math.exp(-dt * 28); // eye movements are fast
     e.yaw += (yaw - e.yaw) * k;
     e.pitch += (pitch - e.pitch) * k;
+    if (e.bones) {
+      // turn each eye bone about the head's up and left axes (world space), on top of its pose
+      const hq = this.head.getWorldQuaternion(new THREE.Quaternion());
+      const up = e.up.clone().applyQuaternion(hq), left = e.left.clone().applyQuaternion(hq);
+      const turn = new THREE.Quaternion().setFromAxisAngle(up, THREE.MathUtils.degToRad(e.yaw))
+        .multiply(new THREE.Quaternion().setFromAxisAngle(left, THREE.MathUtils.degToRad(-e.pitch)));
+      e.bones.forEach((b, i) => { if (!e.animated) b.quaternion.copy(e.restLocal[i]); });
+      for (const b of e.bones) {
+        b.updateWorldMatrix(true, false);
+        const world = turn.clone().multiply(b.getWorldQuaternion(new THREE.Quaternion()));
+        b.quaternion.copy(b.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(world));
+      }
+      return;
+    }
     const w = e.mesh.morphTargetInfluences;
     const [l, r, u, d] = e.keys;
     w[l] = Math.max(0, e.yaw) / 25;
@@ -482,10 +525,13 @@ export class Stage {
 
   updateFace(t, dt) {
     if (!this.morphMeshes.length) return;
-    const target = { ...(EXPRESSIONS[this.expression] ?? {}) };
+    // MakeHuman face units or Apple ARKit face shapes, whichever this character has
+    const arkit = this.morphMeshes.some((m) => m.morphTargetDictionary.eyeBlinkLeft !== undefined);
+    const BLINK_UNITS = arkit ? ARKIT_BLINK : MH_BLINK;
+    const target = { ...((arkit ? ARKIT_EXPRESSIONS : EXPRESSIONS)[this.expression] ?? {}) };
     // blink every few seconds, unless the expression is already closing an eye
     let blink = 0;
-    if (!target['eye-left-closure'] && !target['eye-right-closure']) {
+    if (!target[BLINK_UNITS[0]] && !target[BLINK_UNITS[1]]) {
       if (t > this.nextBlink + 0.18) this.nextBlink = t + 2.2 + Math.random() * 3.5;
       if (t > this.nextBlink) blink = Math.sin(((t - this.nextBlink) / 0.18) * Math.PI);
     }

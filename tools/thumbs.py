@@ -3,6 +3,7 @@
 Run: blender -b -P thumbs.py -- <models dir> <out dir> person1 person2 ...
 Rendering the GLB (not the build scene) shows exactly what the browser gets.
 """
+import glob
 import json
 import math
 import os
@@ -18,7 +19,9 @@ os.makedirs(out_dir, exist_ok=True)
 
 for pid in people:
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.gltf(filepath=os.path.join(models, f"{pid}_formal.glb"))
+    # the first outfit the person has (formal if there is one)
+    files = sorted(glob.glob(os.path.join(models, f"{pid}_*.glb")), key=lambda f: not f.endswith("_formal.glb"))
+    bpy.ops.import_scene.gltf(filepath=files[0])
     scene = bpy.context.scene
     arm = next(o for o in scene.objects if o.type == "ARMATURE")
     idle = bpy.data.actions.get("Idle")

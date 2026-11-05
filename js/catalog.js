@@ -1,15 +1,18 @@
 // The people, outfits, outfit colours and facial expressions you can pick in the editor.
-// The characters themselves are rigged GLB files in models/, built in Blender by tools/build.py.
+// The characters are rigged GLB files in models/, converted in Blender by tools/rb_build.py from
+// the Microsoft Rocketbox avatar library (MIT licence). Each person comes dressed in one outfit.
 
-export const OUTFITS = { formal: 'Office formal', casual: 'Casual', smart: 'Smart casual' };
+export const OUTFITS = { formal: 'Office formal', smart: 'Smart casual', casual: 'Casual' };
 
 export const PEOPLE = [
-  { id: 'arjun', name: 'Arjun', about: '28, athletic', outfits: ['formal', 'smart', 'casual'] },
-  { id: 'vikram', name: 'Vikram', about: '40, business owner', outfits: ['formal', 'smart', 'casual'] },
-  { id: 'daniel', name: 'Daniel', about: '31, designer', outfits: ['formal', 'smart', 'casual'] },
-  { id: 'marcus', name: 'Marcus', about: '26, fitness coach', outfits: ['formal', 'smart', 'casual'] },
-  { id: 'meera', name: 'Meera', about: '27, engineer', outfits: ['formal', 'smart', 'casual'] },
-  { id: 'sarah', name: 'Sarah', about: '34, manager', outfits: ['formal', 'smart', 'casual'] },
+  { id: 'sophia', name: 'Sophia', about: '32, lawyer', outfits: ['formal'] },
+  { id: 'mia', name: 'Mia', about: '27, architect', outfits: ['smart'] },
+  { id: 'priya', name: 'Priya', about: '25, student', outfits: ['casual'] },
+  { id: 'emma', name: 'Emma', about: '29, photographer', outfits: ['casual'] },
+  { id: 'daniel', name: 'Daniel', about: '35, banker', outfits: ['formal'] },
+  { id: 'marcus', name: 'Marcus', about: '31, consultant', outfits: ['formal'] },
+  { id: 'arjun', name: 'Arjun', about: '28, engineer', outfits: ['smart'] },
+  { id: 'ryan', name: 'Ryan', about: '30, designer', outfits: ['smart'] },
 ];
 
 // Outfit colours multiply the fabric texture; null keeps the original colours.
@@ -18,7 +21,7 @@ export const TINTS = [
   ['#7a1f2b', 'Burgundy'], ['#2f5d50', 'Forest'], ['#4a6fa5', 'Blue'], ['#d9d4c7', 'Cream'],
 ];
 
-// Facial expressions as mixes of MakeHuman face units (morph targets on the face, brows, lashes and teeth).
+// Facial expressions as mixes of MakeHuman face units (for MakeHuman-built characters).
 export const EXPRESSIONS = {
   Neutral: {},
   Smile: {
@@ -52,13 +55,38 @@ export const EXPRESSIONS = {
   Wink: { 'eye-left-closure': 1, 'mouth-corner-puller': 0.6, 'eyebrows-left-down': 0.3 },
 };
 
+// The same expressions for characters with Apple ARKit face shapes (the Rocketbox characters).
+const both = (l, r, v) => ({ [l]: v, [r]: v });
+export const ARKIT_EXPRESSIONS = {
+  Neutral: {},
+  Smile: { ...both('mouthSmileLeft', 'mouthSmileRight', 0.65), ...both('cheekSquintLeft', 'cheekSquintRight', 0.3), ...both('eyeSquintLeft', 'eyeSquintRight', 0.15) },
+  'Big laugh': {
+    ...both('mouthSmileLeft', 'mouthSmileRight', 0.9), jawOpen: 0.4, ...both('cheekSquintLeft', 'cheekSquintRight', 0.55),
+    ...both('eyeSquintLeft', 'eyeSquintRight', 0.4), browInnerUp: 0.2, ...both('mouthUpperUpLeft', 'mouthUpperUpRight', 0.25),
+  },
+  Excited: {
+    ...both('mouthSmileLeft', 'mouthSmileRight', 0.8), jawOpen: 0.35, browInnerUp: 0.5,
+    ...both('browOuterUpLeft', 'browOuterUpRight', 0.6), ...both('eyeWideLeft', 'eyeWideRight', 0.4),
+  },
+  Confident: { ...both('mouthSmileLeft', 'mouthSmileRight', 0.25), browOuterUpRight: 0.35, ...both('eyeSquintLeft', 'eyeSquintRight', 0.2), ...both('mouthPressLeft', 'mouthPressRight', 0.2) },
+  Serious: { ...both('browDownLeft', 'browDownRight', 0.45), ...both('mouthPressLeft', 'mouthPressRight', 0.4), ...both('eyeSquintLeft', 'eyeSquintRight', 0.2) },
+  Surprised: { browInnerUp: 0.9, ...both('browOuterUpLeft', 'browOuterUpRight', 0.9), ...both('eyeWideLeft', 'eyeWideRight', 0.8), jawOpen: 0.35 },
+  Angry: {
+    ...both('browDownLeft', 'browDownRight', 0.9), ...both('eyeSquintLeft', 'eyeSquintRight', 0.4), ...both('noseSneerLeft', 'noseSneerRight', 0.45),
+    ...both('mouthPressLeft', 'mouthPressRight', 0.5), ...both('mouthFrownLeft', 'mouthFrownRight', 0.3),
+  },
+  Sad: { browInnerUp: 0.8, ...both('mouthFrownLeft', 'mouthFrownRight', 0.6), ...both('eyeSquintLeft', 'eyeSquintRight', 0.15), mouthShrugLower: 0.3 },
+  Wink: { eyeBlinkLeft: 1, ...both('mouthSmileLeft', 'mouthSmileRight', 0.45), cheekSquintLeft: 0.4 },
+};
+
 // The face each move starts with (you can still pick another expression afterwards).
 export const MOVE_EXPRESSION = {
   Idle: 'Neutral', Walk: 'Confident', Wave: 'Smile', Talk: 'Smile', Argue: 'Angry', Happy: 'Excited',
   Laugh: 'Big laugh', Drink: 'Neutral', Boxing: 'Serious',
+  Confident: 'Confident', Cheer: 'Excited', Clap: 'Smile', Think: 'Serious', Shrug: 'Neutral', Phone: 'Smile',
 };
 
-export const DEFAULT ={ person: 'arjun', outfit: 'formal', tint: null, expression: 'Neutral', move: 'Idle' };
+export const DEFAULT ={ person: 'sophia', outfit: 'formal', tint: null, expression: 'Neutral', move: 'Idle' };
 
 export const modelUrl = (person, outfit) => `models/${person}_${outfit}.glb`;
 export const thumbUrl = (person) => `models/thumbs/${person}.jpg`;
