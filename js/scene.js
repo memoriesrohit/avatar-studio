@@ -1,18 +1,24 @@
-// The 3D stage: loads a rigged character (GLB), plays its moves, drives facial expressions
-// through morph targets, blinks, and frames the camera.
+// The 3D stage: loads a rigged character (GLB), plays its motion-captured moves, drives facial
+// expressions through morph targets, blinks, keeps eye contact with the camera, and renders with
+// studio lighting and ambient occlusion.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { EXPRESSIONS } from './catalog.js';
 
 const BLINK_UNITS = ['eye-left-closure', 'eye-right-closure'];
 const NOT_CLOTHES = /^(Body|Eyes|Eyebrows|Eyelashes|Teeth|Tongue|Hair)/;
+// moves calm enough for the character to hold eye contact with the viewer
+const EYE_CONTACT = new Set(['Idle', 'Talk', 'Wave', 'Shrug', 'Happy']);
 
 function setupLights(scene) {
-  scene.add(new THREE.HemisphereLight(0xfff4e8, 0x6d6680, 0.55));
-  const key = new THREE.DirectionalLight(0xfff1e0, 2.4);
+  const key = new THREE.DirectionalLight(0xfff1e0, 1.6);
   key.position.set(1.8, 3.2, 2.6);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
@@ -21,10 +27,7 @@ function setupLights(scene) {
   key.shadow.bias = -0.0003;
   key.shadow.normalBias = 0.02;
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xdfe8ff, 0.7);
-  fill.position.set(-2.5, 1.6, 1.5);
-  scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xc9b8ff, 1.3);
+  const rim = new THREE.DirectionalLight(0xc9b8ff, 0.9);
   rim.position.set(-1.5, 2.5, -3);
   scene.add(rim);
 }
@@ -39,18 +42,33 @@ const meshLabel = (o) => (o.name && !/^mesh_\d|_\d+$/.test(o.name) ? o.name : o.
  */
 function fixMaterial(o) {
   const label = meshLabel(o);
-  const m = o.material;
-  if (/^(Hair|Eyebrows|Eyelashes)/.test(label)) {
-    Object.assign(m, { transparent: false, alphaTest: 0.35, depthWrite: true, side: THREE.DoubleSide });
+  const src = o.material;
+  // physically based material with sheen: soft velvety highlight on skin, fabric and hair
+  const m = new THREE.MeshPhysicalMaterial({
+    name: src.name, map: src.map, normalMap: src.normalMap, normalScale: src.normalScale, color: src.color,
+    roughness: src.roughness, metalness: 0, roughnessMap: src.roughnessMap, side: src.side,
+  });
+  if (/^Hair/.test(label)) {
+    // matte strands with a faint highlight, not a shiny helmet
+    Object.assign(m, { alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.78, sheen: 0.12, sheenRoughness: 0.5, specularIntensity: 0.25 });
+    m.sheenColor.copy(src.color).multiplyScalar(0.6);
+  } else if (/^(Eyebrows|Eyelashes)/.test(label)) {
+    Object.assign(m, { alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9, specularIntensity: 0 });
   } else if (/^Eyes/.test(label)) {
     // the eye texture's clear part is the cornea in front of the iris
-    Object.assign(m, { transparent: false, alphaTest: 0.5, depthWrite: true, roughness: 0.15 });
+    Object.assign(m, { alphaTest: 0.5, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03 });
+  } else if (/^Body/.test(label)) {
+    Object.assign(m, { roughness: 0.52, sheen: 0.3, sheenRoughness: 0.75, specularIntensity: 0.45 });
+    m.sheenColor.set(0xff9e86);
+  } else if (/^(Teeth|Tongue)/.test(label)) {
+    Object.assign(m, { roughness: 0.35, clearcoat: 0.4 });
   } else {
-    Object.assign(m, { transparent: false, alphaTest: 0, depthWrite: true });
-    if (/^Body/.test(label)) m.alphaMap = null;
-    if (/^Clothes/.test(label)) Object.assign(m, { roughness: 0.8, metalness: 0, roughnessMap: null, metalnessMap: null });
+    // fabric: matte with a soft sheen at grazing angles, like real cloth
+    Object.assign(m, { roughness: 0.82, roughnessMap: null, sheen: 0.6, sheenRoughness: 0.85, specularIntensity: 0.3 });
+    m.sheenColor.copy(src.color).lerp(new THREE.Color(0xffffff), 0.5).multiplyScalar(0.5);
   }
-  m.needsUpdate = true;
+  src.dispose();
+  o.material = m;
 }
 
 export class Stage {
@@ -60,14 +78,19 @@ export class Stage {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMapping = THREE.AgXToneMapping; // natural skin tones, soft highlight roll-off
+    this.renderer.toneMappingExposure = 1.15;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
+    // a real photographed studio (Poly Haven, CC0) lights the character with soft boxes
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
+    new RGBELoader().load('assets/studio_small_09_1k.hdr', (hdr) => {
+      this.scene.environment = pmrem.fromEquirectangular(hdr).texture;
+      this.scene.environmentIntensity = 0.9;
+      hdr.dispose();
+      pmrem.dispose();
+    });
     setupLights(this.scene);
     const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.8, 0.04, 64), new THREE.MeshStandardMaterial({ color: 0x2a2738, roughness: 0.6 }));
     disc.position.y = -0.021;
@@ -83,6 +106,16 @@ export class Stage {
     this.controls.maxPolarAngle = Math.PI * 0.55;
     this.controls.autoRotateSpeed = 1.4;
     this.resetCamera();
+
+    // post-processing: multisampled render, ambient occlusion in folds and contacts, then tone mapping
+    const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    this.composer = new EffectComposer(this.renderer, target);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.ao = new GTAOPass(this.scene, this.camera, 1, 1);
+    this.ao.updateGtaoMaterial({ radius: 0.12, distanceExponent: 1.5, thickness: 1, scale: 1.2, samples: 12 });
+    this.ao.blendIntensity = 0.85;
+    this.composer.addPass(this.ao);
+    this.composer.addPass(new OutputPass());
 
     this.loader = new GLTFLoader();
     this.cache = new Map();
@@ -104,8 +137,8 @@ export class Stage {
   }
 
   resetCamera() {
-    this.camera.position.set(0.9, 1.25, 3.9);
-    this.controls.target.set(0, 0.9, 0);
+    this.camera.position.set(0.9, 1.25, 4.4);
+    this.controls.target.set(0, 0.92, 0);
     this.controls.update();
   }
 
@@ -121,6 +154,8 @@ export class Stage {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -151,6 +186,13 @@ export class Stage {
     });
     this.mixer?.stopAllAction();
     this.mixer = new THREE.AnimationMixer(this.character);
+    this.head = this.character.getObjectByName('mixamorigHead');
+    this.gaze = 0;
+    if (this.head) {
+      // which way the head faces at rest (the character faces +Z), in the head bone's own frame
+      this.character.updateMatrixWorld(true);
+      this.headForward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.head.getWorldQuaternion(new THREE.Quaternion()).invert());
+    }
     this.actions = Object.fromEntries(gltf.animations.map((clip) => [clip.name, this.mixer.clipAction(clip)]));
     this.scene.add(this.character);
     this.applyTint(this.tint);
@@ -182,16 +224,39 @@ export class Stage {
   }
 
   snapshot() {
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
     return this.canvas.toDataURL('image/png');
   }
 
   frame() {
     const dt = Math.min(this.clock.getDelta(), 0.05);
     this.mixer?.update(dt);
+    this.updateGaze(dt);
     this.updateFace(this.clock.elapsedTime, dt);
     this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
+  }
+
+  /** Turn the head a little towards the viewer during calm moves, like natural eye contact. */
+  updateGaze(dt) {
+    const head = this.head;
+    if (!head) return;
+    const want = EYE_CONTACT.has(this.move) ? 1 : 0;
+    this.gaze += (want - this.gaze) * (1 - Math.exp(-dt * 3));
+    if (this.gaze < 0.01) return;
+    head.updateWorldMatrix(true, false);
+    const pos = new THREE.Vector3().setFromMatrixPosition(head.matrixWorld);
+    const world = head.getWorldQuaternion(new THREE.Quaternion());
+    const facing = this.headForward.clone().applyQuaternion(world);
+    const toCam = this.camera.position.clone().sub(pos).normalize();
+    if (facing.dot(toCam) < 0.2) return; // viewer is behind or far to the side
+    const turn = new THREE.Quaternion().setFromUnitVectors(facing, toCam);
+    const angle = 2 * Math.acos(Math.min(1, Math.abs(turn.w)));
+    const limit = THREE.MathUtils.degToRad(28);
+    const amount = (angle > limit ? limit / angle : 1) * 0.65 * this.gaze;
+    const target = new THREE.Quaternion().slerp(turn, amount).multiply(world);
+    const parent = head.parent.getWorldQuaternion(new THREE.Quaternion());
+    head.quaternion.copy(parent.invert().multiply(target));
   }
 
   updateFace(t, dt) {

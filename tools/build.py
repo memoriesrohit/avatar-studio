@@ -21,6 +21,7 @@ from mathutils import Vector
 BASE = "bl_ext.user_default.mpfb"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import anim  # noqa: E402
+import mocap  # noqa: E402
 
 
 def svc(module, cls):
@@ -36,7 +37,7 @@ ClothesService = svc("clothesservice", "ClothesService")
 
 MPFB_DATA = LocationService.get_mpfb_data()
 USER_DATA = LocationService.get_user_data()
-TEXTURE_LIMIT = 1024  # keep GLBs small enough for the web
+TEXTURE_LIMIT = int(os.environ.get("AVATAR_TEXTURES", "2048"))  # skin and clothes; WebP keeps this small
 
 
 def log(*a):
@@ -199,6 +200,46 @@ def render_preview(path, focus="body"):
         bpy.data.objects.remove(o, do_unlink=True)
 
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+MOCAP_DIR = os.environ.get("AVATAR_MOCAP", os.path.join(HERE, "mocap"))
+
+
+def bake_mocap(arm, spec):
+    """Retarget each motion-capture clip in moves.json onto the character's skeleton."""
+    moves = json.load(open(os.path.join(HERE, "moves.json"), encoding="utf-8-sig"))
+    only = [m for m in os.environ.get("AVATAR_MOVES", "").split(",") if m]
+    for m in moves:
+        if only and m["name"] not in only:
+            continue
+        subject = m["clip"].split("_")[0].lstrip("0")
+        clip = mocap.Clip(os.path.join(MOCAP_DIR, f"{subject}.asf"), os.path.join(MOCAP_DIR, f"{m['clip']}.amc"),
+                          m["fps"], m.get("start", 0), m.get("length"), m.get("inplace", "fixed"))
+        if m.get("loop"):
+            a, b = mocap.best_loop(clip, int(m["loop"][0] * mocap.FPS), int(m["loop"][1] * mocap.FPS))
+            clip.trim(a, b)
+        mocap.retarget(arm, clip, m["name"], finger_pose=anim.relaxed_hands())
+        log(spec["id"], "move", m["name"], f"{len(clip) / mocap.FPS:.1f}s")
+
+
+def render_moves(arm, out_dir, sid):
+    """Contact sheet frames: each move at a few moments, to check the retargeting."""
+    tracks = list(arm.animation_data.nla_tracks)
+    for t in tracks:
+        t.mute = True
+    for track in tracks:
+        action = bpy.data.actions[track.name]
+        arm.animation_data.action = action
+        end = int(action.frame_range[1])
+        for k, f in enumerate((0, end // 3, 2 * end // 3)):
+            bpy.context.scene.frame_set(f)
+            head = arm.pose.bones["mixamorig:Head"]
+            log("pose", track.name, f, tuple(round(v, 2) for v in (arm.matrix_world @ head.head)))
+            render_preview(os.path.join(out_dir, "moves", f"{sid}_{track.name.replace(' ', '_')}_{k}.png"))
+        arm.animation_data.action = None
+    for t in tracks:
+        t.mute = False
+
+
 def build(spec, out_dir):
     clear_scene()
     macros = {**TargetService.get_default_macro_info_dict(), **spec["macros"]}
@@ -231,7 +272,8 @@ def build(spec, out_dir):
         except FileNotFoundError as e:
             log("WARNING missing asset", e)
             continue
-        obj = HumanService.add_mhclo_asset(mhclo, human, asset_type=kind, subdiv_levels=0, material_type="MAKESKIN")
+        obj = HumanService.add_mhclo_asset(mhclo, human, asset_type=kind, subdiv_levels=1 if kind in ("Clothes", "Hair") else 0,
+                                           material_type="MAKESKIN")
         if kind in ("Eyebrows", "Eyelashes", "Teeth", "Tongue"):
             face_parts.append(obj)
         named.append((obj, kind if kind != "Clothes" else f"Clothes_{name}"))
@@ -240,7 +282,10 @@ def build(spec, out_dir):
     TargetService.bake_targets(human)
     units = load_face_units(human, spec.get("face_units", "caucasian"))
     transfer_face_units(human, face_parts, units)
-    ExportService.bake_modifiers_remove_helpers(human, bake_masks=True, bake_subdiv=False, remove_helpers=True)
+    # one level of subdivision smooths the face and body silhouette (baked so the face shapes survive)
+    sub = human.modifiers.new("Smooth", "SUBSURF")
+    sub.levels = sub.render_levels = 1
+    ExportService.bake_modifiers_remove_helpers(human, bake_masks=True, bake_subdiv=True, remove_helpers=True)
     shrink_textures()
     if spec.get("skin_tint"):
         tint_skin(human, spec["skin_tint"])
@@ -282,7 +327,9 @@ def build(spec, out_dir):
                 k.value = 0.0
         anim.apply_move(arm, [])
     if spec.get("animations", True):
-        anim.bake_moves(arm)
+        bake_mocap(arm, spec)
+        if os.environ.get("AVATAR_MOVE_PREVIEW"):
+            render_moves(arm, out_dir, spec["id"])
 
     # clear names so the web app can tell skin, hair and clothes apart
     for obj, label in named:
@@ -295,7 +342,7 @@ def build(spec, out_dir):
         filepath=path, export_format="GLB", use_selection=False, export_morph=True, export_morph_normal=False,
         export_skins=True, export_animations=True, export_animation_mode="NLA_TRACKS", export_force_sampling=True,
         export_image_format="WEBP", export_image_quality=80, export_optimize_animation_size=True, export_frame_step=2,
-        export_apply=False, export_yup=True,
+        export_apply=True, export_yup=True,
     )
     log("EXPORTED", path, round(os.path.getsize(path) / 1e6, 2), "MB", len(units), "face units")
 

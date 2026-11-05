@@ -1,6 +1,6 @@
 // Editor UI: pick a person, outfit, outfit colour, expression and move; share and export.
 
-import { PEOPLE, OUTFITS, TINTS, EXPRESSIONS, modelUrl, thumbUrl, sanitize, DEFAULT } from './catalog.js';
+import { PEOPLE, OUTFITS, TINTS, EXPRESSIONS, MOVE_EXPRESSION, modelUrl, thumbUrl, sanitize, DEFAULT } from './catalog.js';
 import { Stage } from './scene.js';
 import { FORMATS, exportAvatar } from './export.js';
 
@@ -144,7 +144,7 @@ function renderMoves() {
     b.dataset.pose = m;
     b.classList.toggle('active', m === stage.move);
     b.onclick = () => {
-      update({ move: m });
+      update({ move: m, expression: MOVE_EXPRESSION[m] ?? config.expression });
       document.querySelectorAll('[data-pose]').forEach((x) => x.classList.toggle('active', x === b));
     };
     return b;

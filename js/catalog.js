@@ -52,7 +52,13 @@ export const EXPRESSIONS = {
   Wink: { 'eye-left-closure': 1, 'mouth-corner-puller': 0.6, 'eyebrows-left-down': 0.3 },
 };
 
-export const DEFAULT = { person: 'arjun', outfit: 'formal', tint: null, expression: 'Smile', move: 'Idle' };
+// The face each move starts with (you can still pick another expression afterwards).
+export const MOVE_EXPRESSION = {
+  Idle: 'Neutral', Walk: 'Confident', Wave: 'Smile', Talk: 'Smile', Shrug: 'Confident', Happy: 'Excited',
+  Laugh: 'Big laugh', Stretch: 'Neutral', Boxing: 'Serious', Salsa: 'Smile', Charleston: 'Big laugh',
+};
+
+export const DEFAULT ={ person: 'arjun', outfit: 'formal', tint: null, expression: 'Neutral', move: 'Idle' };
 
 export const modelUrl = (person, outfit) => `models/${person}_${outfit}.glb`;
 export const thumbUrl = (person) => `models/thumbs/${person}.jpg`;
