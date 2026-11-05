@@ -14,7 +14,14 @@ import { EXPRESSIONS, ARKIT_EXPRESSIONS } from './catalog.js';
 
 const MH_BLINK = ['eye-left-closure', 'eye-right-closure'];
 const ARKIT_BLINK = ['eyeBlinkLeft', 'eyeBlinkRight'];
-const NOT_CLOTHES = /^(Body|Eyes|Eyebrows|Eyelashes|Teeth|Tongue|Hair)/;
+const NOT_CLOTHES = /^(Body|Skin|Shoes|Trousers|Eyes|Eyebrows|Eyelashes|Teeth|Tongue|Hair)/;
+// modular outfit parts: which meshes each top shows (trousers and shoes go with the shirt and T-shirt)
+const OUTFIT_PARTS = {
+  original: ['Outfit_original', 'Skin_original'],
+  shirt: ['Top_shirt', 'Skin_shirt', 'Trousers', 'Shoes'],
+  tee: ['Top_tee', 'Skin_tee', 'Trousers', 'Shoes'],
+};
+const TROUSER_COLOURS = { black: '#3a3b40', blue: '#2c3e6b' };
 // moves calm enough for the character to hold eye contact with the viewer
 const EYE_CONTACT = new Set(['Idle', 'Talk', 'Wave', 'Argue', 'Happy', 'Confident', 'Cheer', 'Laugh', 'Clap', 'Shrug']);
 
@@ -161,7 +168,7 @@ function fixMaterial(o) {
   } else if (/^Eyes/.test(label)) {
     // the eye texture's clear part is the cornea in front of the iris
     Object.assign(m, { alphaTest: 0.5, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03 });
-  } else if (/^Body/.test(label)) {
+  } else if (/^(Body|Skin)/.test(label)) {
     // characters with their own sculpted skin detail (normal + roughness maps) keep it
     const own = !!src.normalMap;
     // (their head texture also carries painted scalp hair, which the pink skin sheen would redden)
@@ -362,7 +369,7 @@ export class Stage {
     this.setupEyes();
     this.actions = Object.fromEntries(gltf.animations.map((clip) => [clip.name, this.mixer.clipAction(clip)]));
     this.scene.add(this.character);
-    this.applyTint(this.tint);
+    this.setOutfit({ ...(this.outfit ?? {}), tint: this.tint });
     this.current = {};
     this.playMove(this.move, 0);
     this.mixer.update(0); // pose the first frame now, so the rest pose never flashes
@@ -385,13 +392,40 @@ export class Stage {
     else if (prev && prev !== next) prev.stop();
   }
 
-  /** Recolour the clothes (multiplies their fabric texture), or restore them with null. */
+  /** Whether this model carries the swappable shirt / T-shirt / trousers. */
+  hasModularOutfit() {
+    return !!this.character?.getObjectByName('Top_shirt');
+  }
+
+  /**
+   * Outfit: { top: 'original' | 'shirt' | 'tee', trousers: 'black' | 'blue', tint: hex | null }.
+   * Shows the chosen top's parts, colours the trousers, and recolours the top.
+   */
+  setOutfit({ top = 'original', trousers = 'black', tint = null } = {}) {
+    this.outfit = { top: this.hasModularOutfit() ? top : 'original', trousers };
+    const show = new Set(OUTFIT_PARTS[this.outfit.top]);
+    const all = new Set(Object.values(OUTFIT_PARTS).flat());
+    this.character?.traverse((o) => {
+      if (!o.isMesh) return;
+      const label = meshLabel(o);
+      if (all.has(label)) o.visible = show.has(label);
+      if (label === 'Trousers') {
+        o.material.color.copy(o.userData.baseColor).multiply(new THREE.Color(TROUSER_COLOURS[trousers] ?? TROUSER_COLOURS.black));
+      }
+    });
+    this.applyTint(tint);
+  }
+
+  /**
+   * Recolour the top (multiplies its fabric texture), or restore it with null. The original
+   * outfits are darker textures, so their colour is lifted; the white shirt / T-shirt take it as is.
+   */
   applyTint(hex) {
     this.tint = hex;
     this.character?.traverse((o) => {
       if (!o.isMesh || NOT_CLOTHES.test(meshLabel(o))) return;
       o.material.color.copy(o.userData.baseColor);
-      if (hex) o.material.color.multiply(new THREE.Color(hex)).multiplyScalar(1.5);
+      if (hex) o.material.color.multiply(new THREE.Color(hex)).multiplyScalar(/^Top_/.test(meshLabel(o)) ? 1 : 1.5);
     });
   }
 

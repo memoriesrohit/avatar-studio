@@ -1,7 +1,6 @@
 """Convert a Microsoft Rocketbox avatar (MIT licence) into an Avatar Studio GLB.
 
 blender -b -P rb_build.py -- <avatar dir> <out.glb> [preview.png]
-(build_all.sh builds every character in the app.)
 
 <avatar dir> is a Rocketbox avatar folder (Export/<name>_facial.fbx and Textures/).
 Steps: import the facial FBX, scale to metres and face -Y, rename the 3ds Max Biped skeleton to
@@ -26,10 +25,7 @@ sys.path.insert(0, WORK)
 import anim  # noqa: E402
 import mocap  # noqa: E402
 
-args = sys.argv[sys.argv.index("--") + 1:]
-SRC, OUT = args[0], args[1]
-PREVIEW = args[2] if len(args) > 2 else None
-NAME = os.path.basename(os.path.normpath(SRC))
+SRC = OUT = PREVIEW = None  # set from the command line in __main__ (or by rb_outfits.py)
 P = mocap.P
 
 
@@ -54,20 +50,26 @@ for s, side in (("L", "Left"), ("R", "Right")):
         BONES[f"Bip01 {s} Finger{i}2"] = f"{side}Hand{finger}3"
 
 
-def import_avatar():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    fbx = glob.glob(os.path.join(SRC, "Export", "*_facial.fbx")) or glob.glob(os.path.join(SRC, "Export", "*.fbx"))
+def import_avatar(src=None, reset=True):
+    """Import a Rocketbox avatar; reset=False adds it to the current scene (for outfit donors)."""
+    src = src or SRC
+    if reset:
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+    fbx = glob.glob(os.path.join(src, "Export", "*_facial.fbx")) or glob.glob(os.path.join(src, "Export", "*.fbx"))
+    before = set(bpy.data.objects)
     # native Biped bone axes (no automatic re-orientation): identical to the animation files' rig,
     # so animations transfer by copying orientations directly
     bpy.ops.import_scene.fbx(filepath=fbx[0], automatic_bone_orientation=False)
-    arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
-    mesh = next(o for o in bpy.data.objects if o.type == "MESH")
+    new = [o for o in bpy.data.objects if o not in before]
+    arm = next(o for o in new if o.type == "ARMATURE")
+    mesh = next(o for o in new if o.type == "MESH")
     # the FBX carries a "Take 001" action that keys the rig at its original centimetre scale; drop it
     for o in (arm, mesh):
         if o.animation_data:
             o.animation_data_clear()
     for a in list(bpy.data.actions):
-        bpy.data.actions.remove(a)
+        if not a.use_fake_user:
+            bpy.data.actions.remove(a)
 
     def settle():
         """Apply the armature's transform (FBX centimetres -> metres), then bake the mesh's resulting
@@ -120,12 +122,13 @@ def roughness_from_specular(spec_path):
     return img
 
 
-def rebuild_materials(mesh):
-    tex = os.path.join(SRC, "Textures")
+def rebuild_materials(mesh, src=None):
+    tex = os.path.join(src or SRC, "Textures")
     for slot in mesh.material_slots:
         mat = slot.material
-        part = mat.name.split("_")[-1]  # body / head / opacity
-        prefix = mat.name.rsplit("_", 1)[0]
+        base = mat.name.split(".")[0]  # (a second import of the same avatar gets ".001" names)
+        part = base.split("_")[-1]  # body / head / opacity
+        prefix = base.rsplit("_", 1)[0]
         nt = mat.node_tree
         nt.nodes.clear()
         out = nt.nodes.new("ShaderNodeOutputMaterial")
@@ -259,7 +262,7 @@ ANIM_DIR = os.environ.get("RB_ANIMS", os.path.join(HERE, "rocketbox", "anims"))
 BACK = {v: k for k, v in BONES.items()}  # Mixamo name -> original Biped name
 
 
-def bake_native(arm):
+def bake_native(arm, female=None):
     """Transfer each Rocketbox animation (same Biped skeleton) onto our rig and bake it as a move.
 
     Both are imported with their native Biped bone axes, so per frame each of our bones takes the
@@ -273,7 +276,8 @@ def bake_native(arm):
     our_rest = {b.name: b.matrix_local.copy() for b in bones}
     for pb in arm.pose.bones:
         pb.rotation_mode = "QUATERNION"
-    female = os.path.basename(glob.glob(os.path.join(SRC, "Textures", "*_head_color.tga"))[0]).startswith("f")
+    if female is None:
+        female = os.path.basename(glob.glob(os.path.join(SRC, "Textures", "*_head_color.tga"))[0]).startswith("f")
     for move, male_clip, female_clip in NATIVE_MOVES:
         clip = female_clip if female else male_clip
         if only and move not in only:
@@ -403,4 +407,8 @@ def main():
     log("EXPORTED", OUT, round(os.path.getsize(OUT) / 1e6, 2), "MB")
 
 
-main()
+if __name__ == "__main__":
+    args = sys.argv[sys.argv.index("--") + 1:]
+    SRC, OUT = args[0], args[1]
+    PREVIEW = args[2] if len(args) > 2 else None
+    main()

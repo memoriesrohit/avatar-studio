@@ -4,6 +4,11 @@
 
 export const OUTFITS = { formal: 'Office formal', smart: 'Smart casual', casual: 'Casual' };
 
+// Tops you can put on anyone (fitted from other Rocketbox characters), or their own outfit.
+export const TOPS = { original: 'Original outfit', shirt: 'White shirt', tee: 'White T-shirt' };
+// Formal trousers worn with the shirt or T-shirt (they multiply a neutral fabric texture).
+export const TROUSERS = { black: ['Black', '#3a3b40'], blue: ['Blue', '#2c3e6b'] };
+
 export const PEOPLE = [
   { id: 'sophia', name: 'Sophia', about: '32, lawyer', outfits: ['formal'] },
   { id: 'mia', name: 'Mia', about: '27, architect', outfits: ['smart'] },
@@ -86,7 +91,7 @@ export const MOVE_EXPRESSION = {
   Confident: 'Confident', Cheer: 'Excited', Clap: 'Smile', Think: 'Serious', Shrug: 'Neutral', Phone: 'Smile',
 };
 
-export const DEFAULT ={ person: 'sophia', outfit: 'formal', tint: null, expression: 'Neutral', move: 'Idle' };
+export const DEFAULT ={ person: 'sophia', outfit: 'formal', top: 'original', trousers: 'black', tint: null, expression: 'Neutral', move: 'Idle' };
 
 export const modelUrl = (person, outfit) => `models/${person}_${outfit}.glb`;
 export const thumbUrl = (person) => `models/thumbs/${person}.jpg`;
@@ -99,6 +104,8 @@ export function sanitize(input) {
   if (person) c.person = person.id;
   const outfits = PEOPLE.find((p) => p.id === c.person).outfits;
   c.outfit = outfits.includes(input.outfit) ? input.outfit : outfits[0];
+  if (input.top in TOPS) c.top = input.top;
+  if (input.trousers in TROUSERS) c.trousers = input.trousers;
   if (TINTS.some(([hex]) => hex === input.tint)) c.tint = input.tint;
   if (input.expression in EXPRESSIONS) c.expression = input.expression;
   if (typeof input.move === 'string' && /^[\w ]{1,30}$/.test(input.move)) c.move = input.move;

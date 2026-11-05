@@ -53,7 +53,8 @@ function patchGlb(buffer) {
 export async function exportAvatar(stage, format, name = 'my-avatar') {
   // the soft hair-edge pass is a display-only copy of the hair: leave it out of files
   const extras = [];
-  stage.character?.traverse((o) => o.name === 'HairTips' && extras.push([o, o.parent]));
+  // (and outfit parts that aren't being worn)
+  stage.character?.traverse((o) => (o.name === 'HairTips' || (o.isMesh && !o.visible)) && extras.push([o, o.parent]));
   for (const [o, parent] of extras) parent.remove(o);
   try {
     return await exportFile(stage, format, name);

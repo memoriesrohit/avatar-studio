@@ -1,6 +1,6 @@
 // Editor UI: pick a person, outfit, outfit colour, expression and move; share and export.
 
-import { PEOPLE, OUTFITS, TINTS, EXPRESSIONS, MOVE_EXPRESSION, modelUrl, thumbUrl, sanitize, DEFAULT } from './catalog.js';
+import { PEOPLE, OUTFITS, TOPS, TROUSERS, TINTS, EXPRESSIONS, MOVE_EXPRESSION, modelUrl, thumbUrl, sanitize, DEFAULT } from './catalog.js';
 import { Stage } from './scene.js';
 import { FORMATS, exportAvatar } from './export.js';
 
@@ -43,10 +43,11 @@ async function showCharacter() {
       if (token === loadToken) $('#loading-bar').style.width = `${Math.round(f * 100)}%`;
     });
     if (token !== loadToken) return;
-    stage.applyTint(config.tint);
+    stage.setOutfit(config);
     stage.expression = config.expression;
     stage.playMove(config.move, 0);
     renderMoves();
+    render(); // the outfit options depend on what this model carries
   } catch (e) {
     console.error(e);
     toast(`Couldn't load this character: ${e.message}`);
@@ -62,7 +63,7 @@ function update(changes) {
   render();
   if (config.person !== before.person || config.outfit !== before.outfit) showCharacter();
   else {
-    stage.applyTint(config.tint);
+    stage.setOutfit(config);
     stage.expression = config.expression;
     if (config.move !== stage.move) stage.playMove(config.move);
   }
@@ -99,14 +100,20 @@ function render() {
   document.querySelectorAll('.preset').forEach((b) => b.classList.toggle('active', b.dataset.id === config.person));
 
   const person = PEOPLE.find((p) => p.id === config.person);
-  const outfits = row('chips', person.outfits.map((o) => chip(OUTFITS[o], config.outfit === o, () => update({ outfit: o }))));
+  const modular = stage.hasModularOutfit();
+  const colourTitle = { original: 'Outfit colour', shirt: 'Shirt colour', tee: 'T-shirt colour' }[config.top];
+  // the person's own outfit, or a white shirt / T-shirt with formal trousers
+  const tops = row('chips', Object.entries(TOPS)
+    .filter(([id]) => id === 'original' || modular)
+    .map(([id, label]) => chip(id === 'original' ? `${label} (${OUTFITS[config.outfit]})` : label, config.top === id, () => update({ top: id }))));
+  const trousers = row('chips', Object.entries(TROUSERS).map(([id, [label]]) => chip(label, config.trousers === id, () => update({ trousers: id }))));
 
   const tints = row('swatches', TINTS.map(([hex, label]) => {
     const b = document.createElement('button');
     b.className = 'swatch' + (config.tint === hex ? ' active' : '') + (hex ? '' : ' original');
     if (hex) b.style.background = hex;
     b.title = label;
-    b.setAttribute('aria-label', `Outfit colour: ${label}`);
+    b.setAttribute('aria-label', `${colourTitle}: ${label}`);
     b.onclick = () => update({ tint: hex });
     return b;
   }));
@@ -114,8 +121,9 @@ function render() {
   const faces = row('chips', Object.keys(EXPRESSIONS).map((e) => chip(e, config.expression === e, () => update({ expression: e }))));
 
   $('#options').replaceChildren(
-    section('Outfit', outfits),
-    section('Outfit colour', tints),
+    section('Outfit', tops),
+    ...(config.top !== 'original' ? [section('Trousers', trousers)] : []),
+    section(colourTitle, tints),
     section('Expression', faces),
   );
 }
@@ -165,7 +173,7 @@ $('#random').onclick = () => {
   const p = PEOPLE[Math.floor(Math.random() * PEOPLE.length)];
   const pick = (list) => list[Math.floor(Math.random() * list.length)];
   update({
-    person: p.id, outfit: pick(p.outfits), tint: pick(TINTS)[0],
+    person: p.id, outfit: pick(p.outfits), tint: pick(TINTS)[0], top: pick(Object.keys(TOPS)), trousers: pick(Object.keys(TROUSERS)),
     expression: pick(Object.keys(EXPRESSIONS)), move: pick(stage.moves.length ? stage.moves : ['Idle']),
   });
 };

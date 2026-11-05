@@ -7,7 +7,7 @@
 ## What you get
 
 - **8 realistic people:** Sophia, Mia, Priya and Emma; Daniel, Marcus, Arjun and Ryan. They're professionally made, fully rigged characters from the Microsoft Rocketbox library, with detailed faces, skin, hair and clothing (colour, normal and gloss maps for both head and body).
-- **Outfits:** office formal, smart casual or casual (each person comes dressed in one), with **outfit colours** that recolour only the clothes and keep the fabric detail
+- **Outfits:** each person's own outfit (office formal, smart casual or casual), or put anyone in a **white shirt or white T-shirt with formal trousers**. Pick the trousers in **black or blue**, and recolour the shirt, T-shirt or original outfit with the colour swatches. Recolouring only touches the clothes and keeps the fabric detail.
 - **10 facial expressions:** neutral, smile, big laugh, excited, confident, serious, surprised, angry, sad and wink. They're built from the 52 Apple ARKit face shapes each character carries. Characters also blink naturally.
 - **13 motion-captured moves:** idle, walk, wave, talk, confident talk, argue, cheer, laugh, drink, clap, think, shrug and phone call. This is professional motion capture recorded for these exact skeletons, with **female performers for the women and male performers for the men**, so no retargeting distorts it. Each move starts with a fitting expression.
 - **Eye contact:** during calm moves the character turns their head and **looks you in the eye**, using real eye bones; the eyes make the small quick darts real eyes do, and moves blend smoothly into each other
@@ -54,7 +54,13 @@ tools/rocketbox/       the Blender script that builds models/ from the Rocketbox
 tools/makehuman/       the earlier MakeHuman + CMU mocap pipeline (no longer used for the shipped models)
 ```
 
-`tools/rocketbox/rb_build.py` turns a Rocketbox avatar into an app-ready GLB in Blender:
+`tools/rocketbox/rb_outfits.py` builds each person (it uses `rb_build.py` for the steps below), then adds the swappable outfit:
+
+- The white shirt, white T-shirt and formal trousers are taken from other Rocketbox characters of the same sex (listed in `DONORS`). Each garment's vertices are moved by how far its bones sit from the person's, then bound to the person's skeleton.
+- Garment faces are sorted into top, trousers, shoes and skin by their dominant bone and the texture colour under them. The trousers end in a straight cut at the ankle, and a top from a different character gets a straight hem a few cm over the waistband, pushed just outside the trousers.
+- Their textures are neutralised: the tops to white and the trousers to light grey, keeping only soft fold shading, so the app can tint them. Bare arms and hands are tinted to the person's own skin colour (measured on the cheeks), and the neckline is snapped onto the person's neck.
+
+`tools/rocketbox/rb_build.py` does the per-person conversion:
 
 1. Imports the avatar's facial FBX with its native 3ds Max Biped skeleton, converts centimetres to metres, and faces it forward.
 2. Renames the skeleton's bones to Mixamo names (`mixamorig:Hips`, …) so tools that expect a Mixamo rig work with the export.
@@ -67,14 +73,14 @@ tools/makehuman/       the earlier MakeHuman + CMU mocap pipeline (no longer use
 
 Download from the [Microsoft Rocketbox repository](https://github.com/microsoft/Microsoft-Rocketbox) into `tools/rocketbox/rocketbox/`:
 
-- for each avatar listed in `tools/rocketbox/build_all.sh` (for example `Professions/Business_Female_04`), its `Export/<name>_facial.fbx` and `Textures/` folder, keeping that layout under `rocketbox/<name>/`
+- for each avatar listed in `tools/rocketbox/build_all.sh` (for example `Professions/Business_Female_04`) and each outfit donor in `DONORS` in `rb_outfits.py` (`Business_Male_06`, `Male_Adult_09`, `Female_Adult_15`, `Female_Adult_17`, `Female_Adult_01`), its `Export/<name>_facial.fbx` and `Textures/` folder, keeping that layout under `rocketbox/<name>/`
 - the animation clips listed in `NATIVE_MOVES` in `rb_build.py`, from `Assets/Animations/all_animations_max_motextr_*`, renamed to `rocketbox/anims/<clip>.fbx`
 
 Then, with Blender 4.2 or newer:
 
 ```bash
 cd tools/rocketbox
-BLENDER=blender sh build_all.sh
+BLENDER=blender sh build_all.sh   # people with swappable outfits
 cd ..
 blender -b -P thumbs.py -- ../models ../models/thumbs sophia mia priya emma daniel marcus arjun ryan
 ```
