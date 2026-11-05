@@ -51,6 +51,18 @@ function patchGlb(buffer) {
 }
 
 export async function exportAvatar(stage, format, name = 'my-avatar') {
+  // the soft hair-edge pass is a display-only copy of the hair: leave it out of files
+  const extras = [];
+  stage.character?.traverse((o) => o.name === 'HairTips' && extras.push([o, o.parent]));
+  for (const [o, parent] of extras) parent.remove(o);
+  try {
+    return await exportFile(stage, format, name);
+  } finally {
+    for (const [o, parent] of extras) parent.add(o);
+  }
+}
+
+async function exportFile(stage, format, name) {
   if (format === 'png') {
     const res = await fetch(stage.snapshot());
     return download(await res.blob(), `${name}.png`);

@@ -220,7 +220,94 @@ def _rotate_bone_to(arm, pb, desired):
     pb.matrix = Matrix.Translation(head) @ q.to_matrix().to_4x4() @ Matrix.Translation(-head) @ m
 
 
-def retarget(arm, clip, name, finger_pose=None, blend=0.4):
+def _side_angle(direction, side):
+    """How far a limb swings out sideways from hanging straight down, in degrees (front view)."""
+    return math.degrees(math.atan2(direction.x * side, -direction.z))
+
+
+def _forward_angle(direction):
+    """How far a limb swings forward from hanging straight down, in degrees (side view; front is -Y)."""
+    return math.degrees(math.atan2(-direction.y, -direction.z))
+
+
+def _swing(arm, pb, axis, deg):
+    m = pb.matrix.copy()
+    head = m.to_translation()
+    q = Quaternion(axis, math.radians(deg))
+    pb.matrix = Matrix.Translation(head) @ q.to_matrix().to_4x4() @ Matrix.Translation(-head) @ m
+    bpy.context.view_layer.update()
+
+
+def _thumb_angle(arm, prefix, side):
+    """Where the thumb points around the forearm: 0 = forward (palm facing the thigh), 90 = outward."""
+    hand = arm.pose.bones.get(P + prefix + "Hand")
+    thumb = arm.pose.bones.get(P + prefix + "HandThumb1")
+    if hand is None or thumb is None:
+        return None
+    axis = Vector(hand.matrix.col[1][:3]).normalized()
+    t = thumb.head - hand.head
+    t = (t - axis * t.dot(axis)).normalized()
+    fwd = Vector((0, -1, 0))
+    fwd = (fwd - axis * fwd.dot(axis)).normalized()
+    out = axis.cross(fwd) * side  # perpendicular, pointing away from the body
+    return math.degrees(math.atan2(t.dot(out), t.dot(fwd)))
+
+
+def _apply_stance(arm, stance, stance_log):
+    """Bring the limbs to a relaxed stance, keeping part of the performer's own movement.
+
+    stance: {bone: {"side": [target, keep], "forward": [target, keep], "thumb": [target, keep]}} for
+    bones named without the Left/Right prefix (Shoulder, Arm, ForeArm, UpLeg). Each measured angle a
+    becomes target + (a - target) * keep. "side" swings the limb out from the body (front view),
+    "forward" swings it to the front (side view), "thumb" twists the forearm so the thumb leads.
+    The character's left is +X, front is -Y, up is +Z. Parents are done before children.
+    """
+    for bone, rules in stance.items():
+        centre = arm.pose.bones.get(P + bone)
+        if centre is not None:
+            # spine, neck, head: lean to the character's left (+X) and forward (-Y), from upright
+            for kind in ("tilt", "pitch"):
+                if kind not in rules:
+                    continue
+                target, keep = rules[kind]
+                d = Vector(centre.matrix.col[1][:3]).normalized()
+                measure = (lambda v: math.degrees(math.atan2(v.x, v.z))) if kind == "tilt" else (lambda v: math.degrees(math.atan2(-v.y, v.z)))
+                a = measure(d)
+                delta = (target + (a - target) * keep) - a
+                _swing(arm, centre, (0, 1, 0) if kind == "tilt" else (1, 0, 0), delta)
+                stance_log.setdefault(f"{bone}.{kind}", []).append((a, measure(Vector(centre.matrix.col[1][:3]).normalized())))
+            continue
+        for side, prefix in ((1, "Left"), (-1, "Right")):
+            pb = arm.pose.bones.get(P + prefix + bone)
+            if pb is None:
+                continue
+            for kind in ("side", "forward", "thumb"):
+                if kind not in rules:
+                    continue
+                target, keep = rules[kind]
+                d = Vector(pb.matrix.col[1][:3]).normalized()
+                if kind == "side":
+                    a = _side_angle(d, side)
+                elif kind == "forward":
+                    a = _forward_angle(d)
+                else:
+                    a = _thumb_angle(arm, prefix, side)
+                    if a is None:
+                        continue
+                delta = (target + (a - target) * keep) - a
+                if kind == "side":
+                    _swing(arm, pb, (0, 1, 0), -delta * side)
+                elif kind == "forward":
+                    _swing(arm, pb, (1, 0, 0), -delta)
+                else:
+                    # twist about the forearm's own axis; positive turns the thumb outward
+                    _swing(arm, pb, d, delta * side)
+                d2 = Vector(pb.matrix.col[1][:3]).normalized()
+                b = _side_angle(d2, side) if kind == "side" else _forward_angle(d2) if kind == "forward" else _thumb_angle(arm, prefix, side)
+                stance_log.setdefault(f"{prefix}{bone}.{kind}", []).append((a, b))
+
+
+def retarget(arm, clip, name, finger_pose=None, blend=0.4, stance=None):
     """Bake `clip` onto `arm` as a new action called `name`.
 
     1. Put the character in the performer's rest pose (T-pose): every limb bone is pointed the way
@@ -249,12 +336,18 @@ def retarget(arm, clip, name, finger_pose=None, blend=0.4):
             bpy.context.view_layer.update()
     matched = {n: b.matrix.to_3x3().copy() for n, b in bones.items()}
     reset()
+    for bone in (stance or {}):
+        pb = arm.pose.bones.get(P + bone)
+        if pb is not None:
+            d = Vector(pb.matrix.col[1][:3]).normalized()
+            print("[mocap]", name, "rest", bone, f"tilt {math.degrees(math.atan2(d.x, d.z)):.1f} pitch {math.degrees(math.atan2(-d.y, d.z)):.1f}", flush=True)
 
     # hip height: performer's standing height maps to the character's standing height
     ratio, standing = fit(clip, hips_rest)
     print("[mocap]", name, f"{len(clip)} frames, leg ratio {ratio:.2f}", flush=True)
 
     frames = []
+    stance_log = {}
     for i in range(len(clip)):
         reset()
         for n in ORDER:
@@ -268,6 +361,8 @@ def retarget(arm, clip, name, finger_pose=None, blend=0.4):
                 loc = Vector((hips_rest.x + r.x * ratio, hips_rest.y + r.y * ratio, hips_rest.z + (r.z - standing) * ratio))
             pb.matrix = Matrix.Translation(loc) @ rot.to_4x4()
             bpy.context.view_layer.update()
+        if stance:
+            _apply_stance(arm, stance, stance_log)
         # grounding: keep the lowest heel or toe on the floor (no floating, no sinking)
         if feet:
             drop = min(min(f.head.z - a, t.tail.z - b) for (f, t), (a, b) in zip(feet, rest_contact))
@@ -282,6 +377,10 @@ def retarget(arm, clip, name, finger_pose=None, blend=0.4):
                     fb.rotation_quaternion = fb.rotation_quaternion @ Quaternion((1, 0, 0), math.radians(deg))
         frames.append({pb.name: (pb.rotation_quaternion.copy(), pb.location.copy()) for pb in arm.pose.bones})
 
+    for limb, pairs in stance_log.items():
+        before = sum(p[0] for p in pairs) / len(pairs)
+        after = sum(p[1] for p in pairs) / len(pairs)
+        print("[mocap]", name, "stance", limb, f"{before:.1f} -> {after:.1f} deg", flush=True)
     smooth(frames)
 
     # loop: ease the last `blend` seconds back into the first frame

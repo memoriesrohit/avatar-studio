@@ -60,10 +60,16 @@ function skinDetail() {
     }
   }
   for (let i = 0; i < N * N; i++) h[i] += (rand() - 0.5) * 0.25; // fine grain
+  poreMap = heightToNormalMap(h, N, 24);
+  return poreMap;
+}
+
+/** Turns a tiling height field into a repeating tangent-space normal map. */
+function heightToNormalMap(h, N, repeat, strength = 1) {
   const img = new Uint8ClampedArray(N * N * 4);
+  const at = (xx, yy) => h[((yy + N) % N) * N + ((xx + N) % N)];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const at = (xx, yy) => h[((yy + N) % N) * N + ((xx + N) % N)];
-    const dx = at(x + 1, y) - at(x - 1, y), dy = at(x, y + 1) - at(x, y - 1);
+    const dx = (at(x + 1, y) - at(x - 1, y)) * strength, dy = (at(x, y + 1) - at(x, y - 1)) * strength;
     const n = new THREE.Vector3(-dx, -dy, 2).normalize();
     const i = (y * N + x) * 4;
     img[i] = (n.x * 0.5 + 0.5) * 255;
@@ -71,13 +77,58 @@ function skinDetail() {
     img[i + 2] = (n.z * 0.5 + 0.5) * 255;
     img[i + 3] = 255;
   }
-  poreMap = new THREE.DataTexture(img, N, N, THREE.RGBAFormat);
-  poreMap.wrapS = poreMap.wrapT = THREE.RepeatWrapping;
-  poreMap.repeat.set(24, 24);
-  poreMap.generateMipmaps = true;
-  poreMap.minFilter = THREE.LinearMipmapLinearFilter;
-  poreMap.needsUpdate = true;
-  return poreMap;
+  const tex = new THREE.DataTexture(img, N, N, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(repeat, repeat);
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/**
+ * Woven cloth: a 2/2 twill (the diagonal weave of suiting and denim) with rounded yarns and slight
+ * thread-to-thread irregularity, so light picks out the weave up close and it fades to flat far away.
+ * MakeHuman clothes have only a colour texture.
+ */
+let weaveMap;
+function fabricDetail() {
+  if (weaveMap) return weaveMap;
+  const N = 128, T = 16, W = N / T; // 16 threads each way per tile
+  const h = new Float32Array(N * N);
+  let seed = 11;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const jitter = Array.from({ length: T * 2 }, () => 0.75 + rand() * 0.5);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const tx = Math.floor(x / W), ty = Math.floor(y / W);
+    const fx = (x % W + 0.5) / W, fy = (y % W + 0.5) / W;
+    const warpUp = ((tx + ty) % 4) < 2; // 2 over, 2 under, stepping one thread per row: the twill diagonal
+    const warp = Math.sin(Math.PI * fx) * jitter[tx], weft = Math.sin(Math.PI * fy) * jitter[T + ty];
+    h[y * N + x] = (warpUp ? warp * (0.6 + 0.4 * Math.sin(Math.PI * fy)) : weft * (0.6 + 0.4 * Math.sin(Math.PI * fx))) + (rand() - 0.5) * 0.15;
+  }
+  weaveMap = heightToNormalMap(h, N, 70, 1.4);
+  return weaveMap;
+}
+
+/** Leather: soft irregular pebble grain for shoes. */
+let grainMap;
+function leatherDetail() {
+  if (grainMap) return grainMap;
+  const N = 128;
+  const h = new Float32Array(N * N);
+  let seed = 23;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 700; i++) {
+    const cx = rand() * N, cy = rand() * N, r = 1.5 + rand() * 2.5;
+    for (let y = -6; y <= 6; y++) for (let x = -6; x <= 6; x++) {
+      const px = (Math.floor(cx) + x + N) % N, py = (Math.floor(cy) + y + N) % N;
+      const d = Math.hypot(x, y);
+      if (d < r * 2.5) h[py * N + px] += 0.5 * Math.exp(-(d * d) / (r * r));
+    }
+  }
+  grainMap = heightToNormalMap(h, N, 30, 0.6);
+  return grainMap;
 }
 
 function fixMaterial(o) {
@@ -87,13 +138,25 @@ function fixMaterial(o) {
   const m = new THREE.MeshPhysicalMaterial({
     name: src.name, map: src.map, normalMap: src.normalMap, normalScale: src.normalScale, color: src.color,
     roughness: src.roughness, metalness: 0, roughnessMap: src.roughnessMap, side: src.side,
+    // ambient occlusion baked in Blender (eye sockets, nostrils, lips, collars, cuffs, folds): it only
+    // darkens ambient and environment light, as real contact shadow does
+    aoMap: src.aoMap, aoMapIntensity: 1,
   });
   if (/^Hair/.test(label)) {
-    // matte strands with a faint highlight, not a shiny helmet
-    Object.assign(m, { alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.78, sheen: 0.12, sheenRoughness: 0.5, specularIntensity: 0.25 });
+    // matte strands with a faint highlight, not a shiny helmet; alpha-to-coverage (with the
+    // multisampled render) gives the strand tips soft edges instead of a hard cut-out
+    Object.assign(m, { alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.78, sheen: 0.12, sheenRoughness: 0.5, specularIntensity: 0.25 });
     m.sheenColor.copy(src.color).multiplyScalar(0.6);
   } else if (/^(Eyebrows|Eyelashes)/.test(label)) {
-    Object.assign(m, { alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9, specularIntensity: 0 });
+    // brow and lash textures are all soft, partial alpha (individual fine hairs): blend them over the
+    // skin rather than cutting them at a threshold, which turned brows into solid painted strokes
+    // (their alpha is faint, so it is strengthened: dense in the middle, wispy at the ends)
+    Object.assign(m, { transparent: true, depthWrite: false, alphaTest: 0.01, side: THREE.DoubleSide, roughness: 0.9, specularIntensity: 0 });
+    if (src.map && !src.userData.boosted) {
+      m.map = featheredAlpha(src.map, 0, /^Eyebrows/.test(label) ? 2.2 : 1.6);
+      m.userData.boosted = true;
+    }
+    o.renderOrder = 2;
   } else if (/^Eyes/.test(label)) {
     // the eye texture's clear part is the cornea in front of the iris
     Object.assign(m, { alphaTest: 0.5, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03 });
@@ -103,13 +166,61 @@ function fixMaterial(o) {
     m.sheenColor.set(0xff9e86);
   } else if (/^(Teeth|Tongue)/.test(label)) {
     Object.assign(m, { roughness: 0.35, clearcoat: 0.4 });
+  } else if (/shoe|boot/i.test(label)) {
+    // leather: smoother and glossier than cloth, with a fine grain
+    Object.assign(m, { roughness: 0.45, roughnessMap: null, clearcoat: 0.3, clearcoatRoughness: 0.35, specularIntensity: 0.6, normalMap: src.normalMap ?? leatherDetail() });
+    m.normalScale.set(0.4, 0.4);
   } else {
-    // fabric: matte with a soft sheen at grazing angles, like real cloth
-    Object.assign(m, { roughness: 0.82, roughnessMap: null, sheen: 0.6, sheenRoughness: 0.85, specularIntensity: 0.3 });
+    // fabric: matte with a soft sheen at grazing angles and a woven surface, like real cloth
+    Object.assign(m, { roughness: 0.82, roughnessMap: null, sheen: 0.6, sheenRoughness: 0.85, specularIntensity: 0.3, normalMap: src.normalMap ?? fabricDetail() });
+    m.normalScale.set(0.5, 0.5);
     m.sheenColor.copy(src.color).lerp(new THREE.Color(0xffffff), 0.5).multiplyScalar(0.5);
   }
   src.dispose();
   o.material = m;
+}
+
+/** A copy of a texture whose alpha is slightly blurred (and optionally strengthened), for soft strand edges. */
+function featheredAlpha(tex, px = 3, gain = 1) {
+  const img = tex.image;
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const g = c.getContext('2d');
+  g.filter = `blur(${px}px)`;
+  g.drawImage(img, 0, 0);
+  const blurred = g.getImageData(0, 0, c.width, c.height);
+  g.filter = 'none';
+  g.clearRect(0, 0, c.width, c.height);
+  g.drawImage(img, 0, 0);
+  const sharp = g.getImageData(0, 0, c.width, c.height);
+  // keep the sharp colour, take only the softened alpha
+  for (let i = 3; i < sharp.data.length; i += 4) sharp.data[i] = Math.min(255, blurred.data[i] * gain);
+  g.putImageData(sharp, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = tex.colorSpace;
+  t.flipY = tex.flipY;
+  t.wrapS = tex.wrapS;
+  t.wrapT = tex.wrapT;
+  t.channel = tex.channel;
+  t.anisotropy = 8;
+  return t;
+}
+
+/**
+ * Hair in two passes, the usual real-time hair technique: the solid core is drawn opaque (correct
+ * depth, no sorting problems), then a blended pass draws only the soft strand edges around it.
+ */
+function addHairTips(o) {
+  const tips = o.clone();
+  const m = o.material.clone();
+  Object.assign(m, { map: featheredAlpha(o.material.map), alphaTest: 0.02, alphaToCoverage: false, transparent: true, depthWrite: false });
+  tips.material = m;
+  tips.name = 'HairTips';
+  tips.renderOrder = 1;
+  tips.castShadow = false;
+  o.parent.add(tips);
+  return tips;
 }
 
 export class Stage {
@@ -216,15 +327,18 @@ export class Stage {
     this.gltf = gltf;
     this.character = gltf.scene;
     this.morphMeshes = [];
+    const hair = [];
     this.character.traverse((o) => {
-      if (!o.isMesh) return;
+      if (!o.isMesh || o.name === 'HairTips') return;
       o.castShadow = true;
       o.receiveShadow = true;
       o.frustumCulled = false; // skinned meshes move outside their rest-pose bounds
       fixMaterial(o);
       o.userData.baseColor ??= o.material.color.clone();
       if (o.morphTargetDictionary) this.morphMeshes.push(o);
+      if (/^Hair/.test(meshLabel(o)) && o.material.map) hair.push(o);
     });
+    for (const o of hair) if (!o.userData.tips) o.userData.tips = addHairTips(o);
     this.mixer?.stopAllAction();
     this.mixer = new THREE.AnimationMixer(this.character);
     this.head = this.character.getObjectByName('mixamorigHead');
@@ -234,6 +348,7 @@ export class Stage {
       this.character.updateMatrixWorld(true);
       this.headForward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.head.getWorldQuaternion(new THREE.Quaternion()).invert());
     }
+    this.setupEyes();
     this.actions = Object.fromEntries(gltf.animations.map((clip) => [clip.name, this.mixer.clipAction(clip)]));
     this.scene.add(this.character);
     this.applyTint(this.tint);
@@ -246,12 +361,16 @@ export class Stage {
     return this.gltf ? this.gltf.animations.map((c) => c.name) : [];
   }
 
-  playMove(name, fade = 0.35) {
+  playMove(name, fade = 0.6) {
     const next = this.actions[name] ?? this.actions.Idle;
     if (!next) return;
+    const prev = this.actions[this.move];
     this.move = this.actions[name] ? name : 'Idle';
-    for (const a of Object.values(this.actions)) if (a !== next) a.fadeOut(fade);
-    next.reset().setEffectiveWeight(1).fadeIn(fade).play();
+    for (const a of Object.values(this.actions)) if (a !== next && a !== prev) a.stop();
+    next.reset().setEffectiveWeight(1).play();
+    // a smooth hand-over from the move being played, long enough that big pose changes don't snap
+    if (prev && prev !== next && fade > 0) next.crossFadeFrom(prev, fade, false);
+    else if (prev && prev !== next) prev.stop();
   }
 
   /** Recolour the clothes (multiplies their fabric texture), or restore them with null. */
@@ -273,6 +392,7 @@ export class Stage {
     const dt = Math.min(this.clock.getDelta(), 0.05);
     this.mixer?.update(dt);
     this.updateGaze(dt);
+    this.updateEyes(this.clock.elapsedTime, dt);
     this.updateFace(this.clock.elapsedTime, dt);
     this.controls.update();
     this.composer.render();
@@ -298,6 +418,66 @@ export class Stage {
     const target = new THREE.Quaternion().slerp(turn, amount).multiply(world);
     const parent = head.parent.getWorldQuaternion(new THREE.Quaternion());
     head.quaternion.copy(parent.invert().multiply(target));
+  }
+
+  /**
+   * The eyes' own frame in the head bone, taken from the bind pose (so it doesn't depend on the pose
+   * the character was in when loaded): eye centre, and the head's forward, left and up directions.
+   */
+  setupEyes() {
+    this.eyes = null;
+    const mesh = this.character.getObjectByName('Eyes');
+    const dict = mesh?.morphTargetDictionary;
+    if (!this.head || !dict || dict['eyes-look-left'] === undefined) return;
+    const bi = mesh.skeleton.bones.indexOf(this.head);
+    if (bi < 0) return;
+    const inv = mesh.skeleton.boneInverses[bi]; // mesh space -> head bone space, at bind
+    mesh.geometry.computeBoundingBox();
+    const centre = mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(inv);
+    const rot = new THREE.Matrix3().setFromMatrix4(inv);
+    const dir = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix3(rot).normalize();
+    this.eyes = {
+      mesh, centre, forward: dir(0, 0, 1), left: dir(1, 0, 0), up: dir(0, 1, 0),
+      keys: ['eyes-look-left', 'eyes-look-right', 'eyes-look-up', 'eyes-look-down'].map((k) => dict[k]),
+      yaw: 0, pitch: 0, dart: new THREE.Vector2(), nextDart: 0,
+    };
+  }
+
+  /**
+   * Eyes: they look at the viewer during eye contact (the head only turns part of the way), and make
+   * small quick darts (saccades) every so often, as living eyes never hold perfectly still.
+   */
+  updateEyes(t, dt) {
+    const e = this.eyes;
+    if (!e) return;
+    if (t > e.nextDart) {
+      const r = this.gaze > 0.5 ? 1.8 : 5; // small darts while holding eye contact, wider when looking around
+      e.dart.set((Math.random() * 2 - 1) * r, (Math.random() * 2 - 1) * r * 0.6);
+      e.nextDart = t + 0.5 + Math.random() * 2.3;
+    }
+    let yaw = e.dart.x, pitch = e.dart.y;
+    if (this.gaze > 0.01) {
+      this.head.updateWorldMatrix(true, false);
+      const eyePos = e.centre.clone().applyMatrix4(this.head.matrixWorld);
+      const local = this.camera.position.clone().sub(eyePos)
+        .applyQuaternion(this.head.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();
+      const f = local.dot(e.forward);
+      if (f > 0.3) {
+        yaw += THREE.MathUtils.radToDeg(Math.atan2(local.dot(e.left), f)) * this.gaze;
+        pitch += THREE.MathUtils.radToDeg(Math.atan2(local.dot(e.up), f)) * this.gaze;
+      }
+    }
+    yaw = THREE.MathUtils.clamp(yaw, -25, 25);
+    pitch = THREE.MathUtils.clamp(pitch, -20, 20);
+    const k = 1 - Math.exp(-dt * 28); // eye movements are fast
+    e.yaw += (yaw - e.yaw) * k;
+    e.pitch += (pitch - e.pitch) * k;
+    const w = e.mesh.morphTargetInfluences;
+    const [l, r, u, d] = e.keys;
+    w[l] = Math.max(0, e.yaw) / 25;
+    w[r] = Math.max(0, -e.yaw) / 25;
+    w[u] = Math.max(0, e.pitch) / 20;
+    w[d] = Math.max(0, -e.pitch) / 20;
   }
 
   updateFace(t, dt) {

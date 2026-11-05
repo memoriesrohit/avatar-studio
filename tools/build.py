@@ -16,6 +16,7 @@ import sys
 import zipfile
 
 import bpy
+import numpy as np
 from mathutils import Vector
 
 BASE = "bl_ext.user_default.mpfb"
@@ -85,6 +86,224 @@ def load_face_units(human, ethnicity):
             TargetService.load_target(human, os.path.join(folder, f), weight=0.0, name=name)
             names.append(name)
     return names
+
+
+def _gltf_output_group():
+    """Node group the glTF exporter reads extra maps from; its 'Occlusion' input becomes occlusionTexture."""
+    group = bpy.data.node_groups.get("glTF Material Output")
+    if group is None:
+        group = bpy.data.node_groups.new("glTF Material Output", "ShaderNodeTree")
+        group.interface.new_socket("Occlusion", in_out="INPUT", socket_type="NodeSocketFloat")
+    return group
+
+
+def _base_color_size(mat, fallback=2048):
+    for node in mat.node_tree.nodes:
+        if node.type == "TEX_IMAGE" and node.image is not None and node.image.size[0] > 0:
+            return max(node.image.size[0], node.image.size[1])
+    return fallback
+
+
+def _use_gpu():
+    prefs = bpy.context.preferences.addons["cycles"].preferences
+    for kind in ("OPTIX", "CUDA", "HIP", "ONEAPI"):
+        try:
+            prefs.compute_device_type = kind
+            prefs.get_devices()
+        except TypeError:
+            continue
+        gpus = [d for d in prefs.devices if d.type == kind]
+        if gpus:
+            for d in prefs.devices:
+                d.use = d.type == kind
+            return kind
+    return "CPU"
+
+
+def bake_ao(objects, hide=(), distance=0.07, samples=96):
+    """Bake ambient occlusion (eye sockets, nostrils, ears, lips, collars, cuffs, folds) per object.
+
+    Following the texture-workflow rule "AO: multiply in shader, not base colour", each AO map is wired
+    into the glTF 'Occlusion' slot, so engines apply it to ambient light only and colours stay clean.
+    Hair, brows and lashes are hidden while baking: their see-through cards would otherwise darken the
+    scalp and forehead like solid helmets.
+    """
+    scene = bpy.context.scene
+    old_engine = scene.render.engine
+    scene.render.engine = "CYCLES"
+    device = _use_gpu()
+    scene.cycles.device = "GPU" if device != "CPU" else "CPU"
+    scene.cycles.samples = samples
+    scene.world = scene.world or bpy.data.worlds.new("w")
+    scene.world.light_settings.distance = distance
+    hidden = [(o, o.hide_render) for o in hide]
+    for o in hide:
+        o.hide_render = True
+    for obj in objects:
+        mats = [s.material for s in obj.material_slots if s.material and s.material.node_tree]
+        if not mats or not obj.data.uv_layers:
+            continue
+        size = min(2048, _base_color_size(mats[0]))
+        img = bpy.data.images.new(f"{obj.name}_ao", size, size)
+        img.colorspace_settings.name = "Non-Color"
+        targets = []
+        for m in mats:
+            node = m.node_tree.nodes.new("ShaderNodeTexImage")
+            node.image = img
+            m.node_tree.nodes.active = node
+            targets.append((m, node))
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.bake(type="AO", margin=16, use_clear=True)
+        img.pack()
+        for m, node in targets:
+            group = m.node_tree.nodes.new("ShaderNodeGroup")
+            group.node_tree = _gltf_output_group()
+            sep = m.node_tree.nodes.new("ShaderNodeSeparateColor")
+            m.node_tree.links.new(node.outputs["Color"], sep.inputs["Color"])
+            m.node_tree.links.new(sep.outputs["Red"], group.inputs["Occlusion"])
+        log("ao", obj.name, f"{size}px", device)
+    for o, was in hidden:
+        o.hide_render = was
+    scene.render.engine = old_engine
+
+
+def _srgb_to_lin(c):
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def _lin_to_srgb(c):
+    c = np.clip(c, 0, 1)
+    return np.where(c <= 0.0031308, c * 12.92, 1.055 * c ** (1 / 2.4) - 0.055)
+
+
+def _pixels(img):
+    a = np.empty(img.size[0] * img.size[1] * 4, np.float32)
+    img.pixels.foreach_get(a)
+    return a.reshape(img.size[1], img.size[0], 4)
+
+
+def _blur(m, radius):
+    """Three box-blur passes each way, close to a Gaussian."""
+    for axis in (0, 1):
+        for _ in range(3):
+            c = np.cumsum(np.pad(m, [(radius + 1, radius) if a == axis else (0, 0) for a in (0, 1)], mode="edge"), axis=axis)
+            m = (np.take(c, range(2 * radius + 1, c.shape[axis]), axis=axis) - np.take(c, range(0, c.shape[axis] - 2 * radius - 1), axis=axis)) / (2 * radius + 1)
+    return m
+
+
+def _texture_feeding(mat, socket="Base Color"):
+    """The image texture node behind a material's base colour, looking through the tint Mix node."""
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    node = bsdf.inputs[socket].links[0].from_node if bsdf and bsdf.inputs[socket].is_linked else None
+    while node is not None and node.type != "TEX_IMAGE":
+        linked = [s for s in node.inputs if s.is_linked]
+        node = linked[0].links[0].from_node if linked else None
+    return node
+
+
+def bake_scalp(human, layers, skin_tint=None):
+    """Shade the skin under hair and eyebrows with their colour, fading out at the edges.
+
+    Real hair thins out into the scalp, so a hairline is a soft gradient, not the hard edge of a
+    cut-out hair shell. Cycles projects each layer's coverage (its texture alpha) onto the body's
+    skin texture (selected-to-active bake, rays only within a few cm of the skin), the coverage is
+    blurred, and the skin is blended towards the layer's root colour by it.
+    layers: [(object, strength, hair_tint or None)]
+    """
+    scene = bpy.context.scene
+    old_engine = scene.render.engine
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "GPU" if _use_gpu() != "CPU" else "CPU"
+    scene.cycles.samples = 16
+    body_mat = human.material_slots[0].material
+    skin_node = _texture_feeding(body_mat)
+    if skin_node is None:
+        log("WARNING no skin texture for scalp shading")
+        scene.render.engine = old_engine
+        return
+    w, h = skin_node.image.size
+    skin = _pixels(skin_node.image).copy()
+    rgb = _srgb_to_lin(skin[..., :3])
+    tint = np.array(skin_tint or (1, 1, 1), np.float32)
+    for obj, strength, hair_tint in layers:
+        tex = next((_texture_feeding(s.material) for s in obj.material_slots if s.material), None)
+        if tex is None:
+            continue
+        # root colour: the hair texture's solid strands, darkened a little (roots and shadow)
+        hp = _pixels(tex.image)
+        solid = hp[..., 3] > 0.6
+        root = _srgb_to_lin(hp[solid][:, :3]).mean(0) * np.array(hair_tint or (1, 1, 1)) * 0.75
+        # temporary emission material: alpha -> white coverage
+        cover = bpy.data.materials.new("coverage")
+        cover.use_nodes = True
+        nt = cover.node_tree
+        nt.nodes.clear()
+        t = nt.nodes.new("ShaderNodeTexImage"); t.image = tex.image
+        em = nt.nodes.new("ShaderNodeEmission")
+        out = nt.nodes.new("ShaderNodeOutputMaterial")
+        nt.links.new(t.outputs["Alpha"], em.inputs["Color"])
+        nt.links.new(em.outputs["Emission"], out.inputs["Surface"])
+        saved = [s.material for s in obj.material_slots]
+        for s in obj.material_slots:
+            s.material = cover
+        mask_img = bpy.data.images.new(f"{obj.name}_cover", w, h)
+        mask_img.colorspace_settings.name = "Non-Color"
+        target = body_mat.node_tree.nodes.new("ShaderNodeTexImage")
+        target.image = mask_img
+        body_mat.node_tree.nodes.active = target
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        human.select_set(True)
+        bpy.context.view_layer.objects.active = human
+        bpy.ops.object.bake(type="EMIT", use_selected_to_active=True, cage_extrusion=0.07,
+                            max_ray_distance=0.075, margin=8, use_clear=True)
+        mask = _pixels(mask_img)[..., 0]
+        # feather about 1 cm past the hair edge: dense inside, thinning out onto the skin
+        soft = _blur(mask, max(3, w // 180))
+        mask = np.clip(np.maximum(mask, soft * 1.8), 0, 1) * strength
+        target_lin = np.clip(root / np.maximum(tint, 1e-3), 0, 1)
+        rgb = rgb * (1 - mask[..., None]) + target_lin * mask[..., None]
+        for s, m in zip(obj.material_slots, saved):
+            s.material = m
+        body_mat.node_tree.nodes.remove(target)
+        bpy.data.materials.remove(cover)
+        bpy.data.images.remove(mask_img)
+        log("scalp", obj.name, f"coverage {float((mask > 0.05).mean()):.3f}", f"mean {float(mask[mask > 0.05].mean()):.2f}")
+    skin[..., :3] = _lin_to_srgb(rgb)
+    new = bpy.data.images.new(f"{human.name}_skin_scalp", w, h, alpha=True)
+    new.pixels.foreach_set(skin.ravel())
+    new.pack()
+    skin_node.image = new
+    scene.render.engine = old_engine
+
+
+EYE_LOOK = {  # shape key: (axis, degrees) - the character faces -Y, its left is +X
+    "eyes-look-left": ("Z", 25), "eyes-look-right": ("Z", -25),
+    "eyes-look-up": ("X", -20), "eyes-look-down": ("X", 20),
+}
+
+
+def add_eye_look(eyes):
+    """Shape keys that turn both eyeballs (each about its own centre), so the app can aim the gaze."""
+    from mathutils import Matrix
+    if not eyes.data.shape_keys:
+        eyes.shape_key_add(name="Basis", from_mix=False)
+    rest = [v.co.copy() for v in eyes.data.vertices]
+    centres = {}
+    for side in (1, -1):
+        pts = [c for c in rest if c.x * side > 0]
+        lo = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
+        hi = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+        centres[side] = (lo + hi) / 2
+    for name, (axis, deg) in EYE_LOOK.items():
+        rot = Matrix.Rotation(math.radians(deg), 3, axis)
+        key = eyes.shape_key_add(name=name, from_mix=False)
+        for i, c in enumerate(rest):
+            centre = centres[1 if c.x > 0 else -1]
+            key.data[i].co = centre + rot @ (c - centre)
+    log("eye look keys", list(EYE_LOOK))
 
 
 def obj_name(o):
@@ -233,7 +452,7 @@ def bake_mocap(arm, spec):
         if m.get("loop"):
             a, b = mocap.best_loop(clip, int(m["loop"][0] * mocap.FPS), int(m["loop"][1] * mocap.FPS))
             clip.trim(a, b)
-        mocap.retarget(arm, clip, m["name"], finger_pose=anim.relaxed_hands())
+        mocap.retarget(arm, clip, m["name"], finger_pose=anim.relaxed_hands(), stance=m.get("stance"))
         clips[m["name"]] = clip
         log(spec["id"], "move", m["name"], f"{len(clip) / mocap.FPS:.1f}s")
     return clips
@@ -401,6 +620,16 @@ def build(spec, out_dir):
     for obj, label in named:
         if label in ("Hair", "Eyebrows") and spec.get("hair_tint"):
             tint_hair(obj, spec["hair_tint"])
+    for obj, label in named:
+        if label == "Eyes":
+            add_eye_look(obj)
+    if not os.environ.get("AVATAR_NO_SCALP"):
+        layers = [(o, 0.9 if label == "Hair" else 0.45, spec.get("hair_tint"))
+                  for o, label in named if label in ("Hair", "Eyebrows")]
+        bake_scalp(human, layers, spec.get("skin_tint"))
+    if not os.environ.get("AVATAR_NO_AO"):
+        strands = [o for o, label in named if label in ("Hair", "Eyebrows", "Eyelashes")]
+        bake_ao([human] + [o for o, label in named if label.startswith("Clothes")], hide=strands)
 
     arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
     if os.environ.get("AVATAR_BONES"):

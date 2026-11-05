@@ -11,8 +11,10 @@
 - **Outfit colours:** recolour the clothes while keeping the fabric detail
 - **10 facial expressions:** neutral, smile, big laugh, excited, confident, serious, surprised, angry, sad and wink. These are real face shapes, and the eyelids, brows, lashes, teeth and tongue move with them. Characters also blink naturally.
 - **9 motion-captured moves:** idle, walk, wave, talk, argue, happy, laugh, drink and boxing. These are **real recorded human movement** (male performers) from the CMU motion-capture library, retargeted onto each character, smoothed to remove capture jitter, with the feet kept on the floor and the body facing you. Each move starts with a fitting expression, such as a laugh for Laugh.
-- **Skin and eyes:** fine skin-pore detail for light to catch, and natural iris colours with clean whites
-- **Lifelike behaviour:** during calm moves the character turns their head to keep eye contact with you
+- **Skin and eyes:** fine skin-pore detail for light to catch, soft contact shadow baked into the eye sockets, nostrils, lips, ears and between the fingers, and natural iris colours with clean whites
+- **Hair:** soft strand edges instead of a hard cut-out, a hairline that fades into the scalp, and fine, wispy eyebrows and lashes
+- **Clothes:** a woven twill surface on suits, shirts and jeans that catches the light up close, leather grain on shoes, and baked shadow under collars, lapels, pockets and cuffs
+- **Lifelike behaviour:** during calm moves the character turns their head and **looks you in the eye**; the eyes make the small quick darts real eyes do, and moves blend smoothly into each other
 - **Studio rendering:** lit by a photographed studio environment, with soft shadows, ambient occlusion in folds and contact points, and a gentle sheen on skin and fabric
 - **Face close-up**, auto-rotate, randomize and share links
 
@@ -61,11 +63,16 @@ The build script (`tools/build.py`) does this for each person and outfit:
 1. Creates a MakeHuman body from macro settings (gender, age, muscle, weight, height, proportions, ethnicity), then shapes the face with MakeHuman's detail targets (jaw, chin, cheekbones, nose, lips, laugh lines; listed per person in `tools/people.json`).
 2. Adds a skin, eyes (with natural iris textures made by `tools/make_eyes.py`), eyebrows, eyelashes, teeth, tongue, hair, clothes and shoes, all fitted to that body, and smooths the body and clothes with one level of subdivision.
 3. Adds a Mixamo-compatible skeleton.
-4. Adds MakeHuman's **34 face units** (eye closure, brow raise, smile, jaw open, …) as shape keys on the face, then refits the brows, lashes, teeth and tongue for each unit so they follow it.
-5. Retargets the motion-capture clips listed in `tools/moves.json` (`tools/mocap.py`). It reads CMU's skeleton and motion files, puts the character in the performer's T-pose, then copies every joint's rotation frame by frame, so arm, leg, spine and head movement keep their twist and timing. Hip height is scaled to the character's legs, the lowest heel or toe is kept on the floor every frame, capture jitter is filtered out, facing comes from the performer's hip and shoulder lines with slow turning removed (so the character keeps facing you), travel across the floor is removed so moves play in place, and each clip is trimmed and blended so it loops without a jump.
+4. Adds MakeHuman's **34 face units** (eye closure, brow raise, smile, jaw open, …) as shape keys on the face, then refits the brows, lashes, teeth and tongue for each unit so they follow it. It also adds four eye-look shape keys, each eyeball turning about its own centre, which the app uses to aim the gaze.
+5. Bakes surface detail with Blender's Cycles renderer (on the GPU when there is one):
+   - **Ambient occlusion** for the skin and every garment, stored as the glTF occlusion map, so it darkens only ambient light and the colour textures stay clean.
+   - **Scalp shading:** the hair's and eyebrows' coverage is projected onto the skin texture and feathered, so the skin under the hair takes the hair's root colour and the hairline fades out softly.
+6. Retargets the motion-capture clips listed in `tools/moves.json` (`tools/mocap.py`). It reads CMU's skeleton and motion files, puts the character in the performer's T-pose, then copies every joint's rotation frame by frame, so arm, leg, spine and head movement keep their twist and timing. Hip height is scaled to the character's legs, the lowest heel or toe is kept on the floor every frame, capture jitter is filtered out, facing comes from the performer's hip and shoulder lines with slow turning removed (so the character keeps facing you), travel across the floor is removed so moves play in place, and each clip is trimmed and blended so it loops without a jump. A move can also set a **stance** in `tools/moves.json`: target angles for the spine, neck, head, arms, forearms and legs, plus how much of the performer's own movement to keep. The Idle uses it to stand upright and relaxed (head level, shoulders down, arms hanging beside the body with palms in) while still breathing and shifting weight naturally.
 
 To check a retarget, set `AVATAR_VERIFY=1` before building: every move is rendered next to the performer's own skeleton (as a stick figure), from the front and the side, and the torso lean of both is logged. `tools/verifysheet.py` turns the renders into one sheet per move.
-6. Exports a GLB with 2048 px WebP textures and sparse morph targets.
+7. Exports a GLB with 2048 px WebP textures and sparse morph targets.
+
+In the browser (`js/scene.js`), clothes get a generated woven-twill normal map and shoes a leather grain, hair is drawn in two passes (an opaque core, then a blended pass for soft strand edges), and brows and lashes are blended over the skin.
 
 Expressions are recipes of those face units (see `EXPRESSIONS` in `js/catalog.js`), so adding a new one takes no 3D work.
 
