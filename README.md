@@ -4,6 +4,8 @@
 
 ![Avatar Studio: a realistic woman in a pinstripe suit, with the customisation panel on the right](docs/screenshot.jpg)
 
+**Try it live: https://memoriesrohit.github.io/avatar-studio/**
+
 ## What you get
 
 - **8 realistic people:** Sophia, Mia, Priya and Emma; Daniel, Marcus, Arjun and Ryan. They're professionally made, fully rigged characters from the Microsoft Rocketbox library, with detailed faces, skin, hair and clothing (colour, normal and gloss maps for both head and body).
