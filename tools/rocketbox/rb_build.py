@@ -17,7 +17,7 @@ import sys
 
 import bpy
 import numpy as np
-from mathutils import Matrix
+from mathutils import Matrix, Quaternion, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(os.path.dirname(HERE), "makehuman")  # CMU mocap tools (only used with RB_CMU=1)
@@ -297,9 +297,14 @@ def bake_native(arm, female=None):
                 smap[b.name] = sname
         src_rest = {sn: (sw @ src.data.bones[sn].matrix_local) for sn in smap.values()}
         hips = P + "Hips"
-        facing = our_rest[hips].to_quaternion() @ src_rest[smap[hips]].to_quaternion().inverted()
+        # turn the motion to our facing: keep only the rotation about the vertical axis. The files'
+        # reference pelvises sit a few degrees tilted (differently per clip); keeping that tilt
+        # leaned the whole body sideways in every move
+        full = our_rest[hips].to_quaternion() @ src_rest[smap[hips]].to_quaternion().inverted()
+        facing = full if os.environ.get("RB_FULL_FACING") else Quaternion((full.w, 0.0, 0.0, full.z)).normalized()
         hips_rest_src = src_rest[smap[hips]].to_translation()
-        frames = []
+        frames, poses = [], []
+        spine, head = P + "Spine", P + "Head"
         for f in range(start, end + 1):
             scene.frame_set(f)
             ev = src.evaluated_get(bpy.context.evaluated_depsgraph_get())  # the animated copy
@@ -328,6 +333,19 @@ def bake_native(arm, female=None):
                 log("debug", move, f, "delta deg", round(math.degrees(d.angle), 1), "basis deg", round(math.degrees(basis[n].to_quaternion().angle), 1),
                     "ev basis", [round(v, 2) for v in ev.pose.bones[smap[n]].matrix_basis.to_quaternion()])
             frames.append(basis)
+            poses.append((pose[hips].copy(), pose[spine].copy(), pose[head].to_translation()))
+        # stand straight: remove the clip's average lean of the upper body (hips -> head) by turning
+        # the lowest spine bone, so posture is upright on average while sway and gestures stay
+        avg = sum(((h - hp.to_translation()).normalized() for hp, sp, h in poses), Vector()).normalized()
+        fix = avg.rotation_difference(Vector((0, 0, 1)))
+        if math.degrees(fix.angle) > 12:
+            fix = Quaternion(fix.axis, math.radians(12))
+        rel_spine = our_rest[hips].inverted() @ our_rest[spine]
+        for basis, (hp, sp, _) in zip(frames, poses):
+            pivot = sp.to_translation()
+            turned = Matrix.Translation(pivot) @ fix.to_matrix().to_4x4() @ Matrix.Translation(-pivot) @ sp
+            basis[spine] = rel_spine.inverted() @ hp.inverted() @ turned
+        log("move", move, "upright fix", round(math.degrees(fix.angle), 1), "deg")
         action = bpy.data.actions.new(move)
         arm.animation_data_create()
         arm.animation_data.action = action
