@@ -14,10 +14,22 @@ export const PEOPLE = [
   { id: 'mia', name: 'Mia', about: '27, architect', outfits: ['smart'] },
   { id: 'priya', name: 'Priya', about: '25, student', outfits: ['casual'] },
   { id: 'emma', name: 'Emma', about: '29, photographer', outfits: ['casual'] },
+  { id: 'aisha', name: 'Aisha', about: '30, doctor', outfits: ['formal'] },
+  { id: 'olivia', name: 'Olivia', about: '33, marketing lead', outfits: ['smart'] },
+  { id: 'mei', name: 'Mei', about: '26, designer', outfits: ['casual'] },
+  { id: 'hannah', name: 'Hannah', about: '24, nurse', outfits: ['casual'] },
   { id: 'daniel', name: 'Daniel', about: '35, banker', outfits: ['formal'] },
   { id: 'marcus', name: 'Marcus', about: '31, consultant', outfits: ['formal'] },
   { id: 'arjun', name: 'Arjun', about: '28, engineer', outfits: ['smart'] },
   { id: 'ryan', name: 'Ryan', about: '30, designer', outfits: ['smart'] },
+  { id: 'james', name: 'James', about: '34, lawyer', outfits: ['formal'] },
+  { id: 'kenji', name: 'Kenji', about: '29, analyst', outfits: ['formal'] },
+  { id: 'leo', name: 'Leo', about: '36, architect', outfits: ['smart'] },
+  { id: 'ethan', name: 'Ethan', about: '27, photographer', outfits: ['casual'] },
+  { id: 'noah', name: 'Noah', about: '31, teacher', outfits: ['smart'] },
+  { id: 'luca', name: 'Luca', about: '28, chef', outfits: ['smart'] },
+  { id: 'carlos', name: 'Carlos', about: '25, musician', outfits: ['casual'] },
+  { id: 'andre', name: 'Andre', about: '30, producer', outfits: ['casual'] },
 ];
 
 // Outfit colours multiply the fabric texture; null keeps the original colours.

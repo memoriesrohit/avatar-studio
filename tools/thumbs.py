@@ -14,7 +14,12 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 models, out_dir, people = argv[0], argv[1], argv[2:]
-faces = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "expressions.json")))
+# a gentle smile: ARKit face shapes (Rocketbox characters) or MakeHuman face units (older builds)
+mh = os.path.join(os.path.dirname(os.path.abspath(__file__)), "makehuman", "expressions.json")
+SMILE = {"mouthSmileLeft": 0.5, "mouthSmileRight": 0.5, "cheekSquintLeft": 0.25, "cheekSquintRight": 0.25,
+         **(json.load(open(mh))["Smile"] if os.path.exists(mh) else {})}
+# swappable outfit parts stay hidden: the thumbnail shows the person's own outfit
+HIDE = ("Top_", "Skin_shirt", "Skin_tee", "Trousers", "Shoes")
 os.makedirs(out_dir, exist_ok=True)
 
 for pid in people:
@@ -32,7 +37,9 @@ for pid in people:
     for o in scene.objects:
         if o.type == "MESH" and o.data.shape_keys:
             for k in o.data.shape_keys.key_blocks[1:]:
-                k.value = faces["Smile"].get(k.name, 0.0)
+                k.value = SMILE.get(k.name, 0.0)
+        if o.type == "MESH" and o.name.startswith(HIDE):
+            o.hide_render = True
         if o.type == "MESH":
             strands = o.name.startswith(("Hair", "Eyebrows", "Eyelashes", "Eyes"))
             for slot in o.material_slots:
@@ -45,7 +52,7 @@ for pid in people:
                     for link in list(bsdf.inputs["Alpha"].links):
                         m.node_tree.links.remove(link)
                     bsdf.inputs["Alpha"].default_value = 1.0
-                if bsdf and o.name.startswith("Clothes"):  # same as the web app: fabric is matte
+                if bsdf and o.name.startswith(("Clothes", "Outfit")):  # same as the web app: fabric is matte
                     for socket in ("Roughness", "Metallic"):
                         for link in list(bsdf.inputs[socket].links):
                             m.node_tree.links.remove(link)

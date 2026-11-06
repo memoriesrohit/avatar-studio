@@ -9,7 +9,7 @@ BLENDER=${BLENDER:-blender}
 SRC=${RB_SRC:-rocketbox}
 OUT=../../models
 for spec in sophia:formal:Business_Female_04:f mia:smart:Female_Adult_05:f priya:casual:Female_Adult_08:f emma:casual:Female_Adult_01:f \
-            daniel:formal:Business_Male_03:m marcus:formal:Business_Male_05:m arjun:smart:Business_Male_06:m ryan:smart:Male_Adult_08:m; do
+            aisha:formal:Business_Female_01:f olivia:smart:Female_Adult_15:f mei:casual:Female_Adult_03:f hannah:casual:Female_Adult_17:f             daniel:formal:Business_Male_03:m marcus:formal:Business_Male_05:m arjun:smart:Business_Male_06:m ryan:smart:Male_Adult_08:m             james:formal:Business_Male_01:m kenji:formal:Business_Male_02:m leo:smart:Male_Adult_07:m ethan:casual:Male_Adult_01:m             noah:smart:Male_Adult_02:m luca:smart:Male_Adult_11:m carlos:casual:Male_Adult_06:m andre:casual:Male_Adult_12:m; do
   id=${spec%%:*}; r=${spec#*:}; outfit=${r%%:*}; r=${r#*:}; avatar=${r%%:*}; sex=${r#*:}
   RB_ANIMS="$SRC/anims" "$BLENDER" -b --factory-startup -P rb_outfits.py -- "$SRC/$avatar" "$sex" "$OUT/${id}_${outfit}.glb" > "build_$id.log" 2>&1
   echo "$id: $(grep -c '\[rb\] move' build_$id.log) moves, $(grep -o 'EXPORTED.* MB' build_$id.log)"

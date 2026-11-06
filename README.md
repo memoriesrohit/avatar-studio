@@ -8,7 +8,7 @@
 
 ## What you get
 
-- **8 realistic people:** Sophia, Mia, Priya and Emma; Daniel, Marcus, Arjun and Ryan. They're professionally made, fully rigged characters from the Microsoft Rocketbox library, with detailed faces, skin, hair and clothing (colour, normal and gloss maps for both head and body).
+- **20 realistic people:** 8 women (Sophia, Mia, Priya, Emma, Aisha, Olivia, Mei and Hannah) and 12 men (Daniel, Marcus, Arjun, Ryan, James, Kenji, Leo, Ethan, Noah, Luca, Carlos and Andre). They're professionally made, fully rigged characters from the Microsoft Rocketbox library, with detailed faces, skin, hair and clothing (colour, normal and gloss maps for both head and body).
 - **Outfits:** each person's own outfit (office formal, smart casual or casual), or put anyone in a **white shirt or white T-shirt with formal trousers**. Pick the trousers in **black or blue**, and recolour the shirt, T-shirt or original outfit with the colour swatches. Recolouring only touches the clothes and keeps the fabric detail.
 - **10 facial expressions:** neutral, smile, big laugh, excited, confident, serious, surprised, angry, sad and wink. They're built from the 52 Apple ARKit face shapes each character carries. Characters also blink naturally.
 - **13 motion-captured moves:** idle, walk, wave, talk, confident talk, argue, cheer, laugh, drink, clap, think, shrug and phone call. This is professional motion capture recorded for these exact skeletons, with **female performers for the women and male performers for the men**, so no retargeting distorts it. Each move starts with a fitting expression.
@@ -49,7 +49,7 @@ js/catalog.js          people, outfits, outfit colours, expression recipes
 js/scene.js            loads a character, plays moves, blinks, eye contact, expressions, materials, lighting
 js/export.js           GLB / glTF / OBJ / STL / USDZ / PNG export
 js/main.js             editor panel, export menu, share links
-models/*.glb           one rigged character per person (8 to 10 MB each)
+models/*.glb           one rigged character per person, with all its outfits (11 to 13 MB each)
 models/thumbs/         picker thumbnails (tools/thumbs.py)
 assets/                studio lighting environment (HDRI)
 tools/rocketbox/       the Blender script that builds models/ from the Rocketbox library
@@ -84,7 +84,7 @@ Then, with Blender 4.2 or newer:
 cd tools/rocketbox
 BLENDER=blender sh build_all.sh   # people with swappable outfits
 cd ..
-blender -b -P thumbs.py -- ../models ../models/thumbs sophia mia priya emma daniel marcus arjun ryan
+blender -b -P thumbs.py -- ../models ../models/thumbs sophia mia priya emma aisha olivia mei hannah daniel marcus arjun ryan james kenji leo ethan noah luca carlos andre
 ```
 
 To add someone, pick any of the 115 Rocketbox avatars, add a line to `build_all.sh` and an entry to `PEOPLE` in `js/catalog.js`.
