@@ -18,7 +18,7 @@ models, out_dir, people = argv[0], argv[1], argv[2:]
 mh = os.path.join(os.path.dirname(os.path.abspath(__file__)), "makehuman", "expressions.json")
 SMILE = {"mouthSmileLeft": 0.5, "mouthSmileRight": 0.5, "cheekSquintLeft": 0.25, "cheekSquintRight": 0.25,
          **(json.load(open(mh))["Smile"] if os.path.exists(mh) else {})}
-# swappable outfit parts stay hidden: the thumbnail shows the person's own outfit
+# swappable outfit parts stay hidden: the thumbnail shows the office-formal look
 HIDE = ("Top_", "Skin_shirt", "Skin_tee", "Trousers", "Shoes")
 os.makedirs(out_dir, exist_ok=True)
 
@@ -38,7 +38,9 @@ for pid in people:
         if o.type == "MESH" and o.data.shape_keys:
             for k in o.data.shape_keys.key_blocks[1:]:
                 k.value = SMILE.get(k.name, 0.0)
-        if o.type == "MESH" and o.name.startswith(HIDE):
+        # show the default look: the fitted office-formal suit when there is one, else their own outfit
+        hide = HIDE + (("Outfit_original", "Skin_original") if scene.objects.get("Outfit_formal") else ())
+        if o.type == "MESH" and o.name.startswith(hide):
             o.hide_render = True
         if o.type == "MESH":
             strands = o.name.startswith(("Hair", "Eyebrows", "Eyelashes", "Eyes"))

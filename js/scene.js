@@ -18,6 +18,7 @@ const NOT_CLOTHES = /^(Body|Skin|Shoes|Trousers|Eyes|Eyebrows|Eyelashes|Teeth|To
 // modular outfit parts: which meshes each top shows (trousers and shoes go with the shirt and T-shirt)
 const OUTFIT_PARTS = {
   original: ['Outfit_original', 'Skin_original'],
+  formal: ['Outfit_formal', 'Skin_formal'],
   shirt: ['Top_shirt', 'Skin_shirt', 'Trousers', 'Shoes'],
   tee: ['Top_tee', 'Skin_tee', 'Trousers', 'Shoes'],
 };
@@ -402,7 +403,10 @@ export class Stage {
    * Shows the chosen top's parts, colours the trousers, and recolours the top.
    */
   setOutfit({ top = 'original', trousers = 'black', tint = null } = {}) {
-    this.outfit = { top: this.hasModularOutfit() ? top : 'original', trousers };
+    // 'formal' is the person's own outfit when that is already a suit (no fitted suit in the model)
+    if (top === 'formal' && !this.character?.getObjectByName('Outfit_formal')) top = 'original';
+    if ((top === 'shirt' || top === 'tee') && !this.hasModularOutfit()) top = 'original';
+    this.outfit = { top, trousers };
     const show = new Set(OUTFIT_PARTS[this.outfit.top]);
     const all = new Set(Object.values(OUTFIT_PARTS).flat());
     this.character?.traverse((o) => {

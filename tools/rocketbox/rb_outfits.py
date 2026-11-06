@@ -355,7 +355,12 @@ def fit_donor(kind, folder, arm, head, waist_top=None, cut_hem=False):
     for i, c in enumerate(cat):
         z = dmesh.data.polygons[i].center.z
         bones_here = [tops[v] or "" for v in dmesh.data.polygons[i].vertices]
-        if c == "hand":
+        if kind == "suit":
+            # the whole suit; hands (and bare feet in open shoes) are skin
+            k = near(i, {"skin": skin, "top": cloth}) if c in ("hand", "foot") else "top"
+            if c == "foot" and k == "skin" and np.linalg.norm(cols[i] - skin) > 0.2:
+                k = "top"  # only what is really skin-coloured
+        elif c == "hand":
             k = near(i, {"skin": skin, "top": cloth})  # shirt cuffs reach over the wrist
         elif c in ("foot", "leg"):
             k = "shoes" if z < ankle else "trousers"
@@ -396,7 +401,7 @@ def fit_donor(kind, folder, arm, head, waist_top=None, cut_hem=False):
         if k in parts:
             protect |= raster(face_uv_tris(dmesh, parts[k]), w, h, grow=0)
     for k, level in (("top", 0.95), ("trousers", 0.8)):
-        if k not in parts or (k == "trousers") != (kind == "trousers"):
+        if kind == "suit" or k not in parts or (k == "trousers") != (kind == "trousers"):
             continue
         mask = raster(face_uv_tris(dmesh, parts[k]), w, h) & ~protect
         ref = np.median(soft[mask]) + 1e-4
@@ -414,6 +419,8 @@ def fit_donor(kind, folder, arm, head, waist_top=None, cut_hem=False):
     # vertices on the edge of dropped faces (the tee's hem above the jeans)
     hem = {vi for f in drop_faces for vi in dmesh.data.polygons[f].vertices}
     names = {"top": f"Top_{kind}", "skin": f"Skin_{kind}", "trousers": "Trousers", "shoes": "Shoes"}
+    if kind == "suit":
+        names.update(top="Outfit_formal", skin="Skin_formal")
     for k in keep:
         if k in parts and k != main_part:
             # indices shift after each separate, so match by face centre
@@ -451,7 +458,8 @@ def fit_donor(kind, folder, arm, head, waist_top=None, cut_hem=False):
 def main():
     args = sys.argv[sys.argv.index("--") + 1:]
     person, sex, out = args[0], args[1], args[2]
-    preview = args[3] if len(args) > 3 else None
+    preview = args[3] if len(args) > 3 and args[3] else None
+    suit_donor = args[4] if len(args) > 4 else None  # office-formal suit for people not wearing one
     root = os.path.dirname(os.path.normpath(person))
     rb.SRC = person
 
@@ -509,8 +517,12 @@ def main():
                     pushed += 1
             log(kind, o.name, "dropped", len(low) if o is top else 0, "low faces; pushed out", pushed)
     shirt, tee = tops["shirt"], tops["tee"]
+    donors_with_skin = [shirt, tee]
+    if suit_donor:
+        suit = fit_donor("suit", os.path.join(root, suit_donor), arm, head)
+        donors_with_skin.append(suit)
     # donor skin takes the person's skin colour
-    for d in (shirt, tee):
+    for d in donors_with_skin:
         ratio = np.clip(person_skin / np.maximum(d["skin_ref"], 1e-3), 0.25, 2.5)
         tint(d["skin"], tuple(float(x) for x in ratio))
         log("skin tint", d["skin"].name, [round(float(x), 2) for x in ratio])
@@ -533,6 +545,15 @@ def main():
                 o.hide_render = o.name not in {"Body", "Hair", "Top_tee", "Skin_tee", "Trousers", "Shoes"}
         bpy.context.scene.render.filepath = preview.replace(".png", "_tee.png")
         bpy.ops.render.render(write_still=True)
+        if suit_donor:
+            for o in bpy.data.objects:
+                if o.type == "MESH":
+                    o.hide_render = o.name not in {"Body", "Hair", "Outfit_formal", "Skin_formal"}
+            bpy.context.scene.render.filepath = preview.replace(".png", "_formal.png")
+            bpy.ops.render.render(write_still=True)
+            for o in bpy.data.objects:
+                if o.type == "MESH":
+                    o.hide_render = o.name not in {"Body", "Hair", "Top_tee", "Skin_tee", "Trousers", "Shoes"}
         cam = bpy.context.scene.camera
         cam.location, cam.data.lens = (0.0, -1.6, 0.95), 50
         bpy.context.scene.render.filepath = preview.replace(".png", "_tee_waist.png")

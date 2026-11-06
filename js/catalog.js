@@ -5,7 +5,9 @@
 export const OUTFITS = { formal: 'Office formal', smart: 'Smart casual', casual: 'Casual' };
 
 // Tops you can put on anyone (fitted from other Rocketbox characters), or their own outfit.
-export const TOPS = { original: 'Original outfit', shirt: 'White shirt', tee: 'White T-shirt' };
+// Everyone wears an office-formal suit by default (their own, or one fitted from a Rocketbox business
+// character); 'original' is the person's own smart or casual outfit when that isn't a suit.
+export const TOPS = { formal: 'Office formal', shirt: 'White shirt', tee: 'White T-shirt', original: 'Own outfit' };
 // Formal trousers worn with the shirt or T-shirt (they multiply a neutral fabric texture).
 export const TROUSERS = { black: ['Black', '#3a3b40'], blue: ['Blue', '#2c3e6b'] };
 
@@ -103,7 +105,7 @@ export const MOVE_EXPRESSION = {
   Confident: 'Confident', Cheer: 'Excited', Clap: 'Smile', Think: 'Serious', Shrug: 'Neutral', Phone: 'Smile',
 };
 
-export const DEFAULT ={ person: 'sophia', outfit: 'formal', top: 'original', trousers: 'black', tint: null, expression: 'Neutral', move: 'Idle' };
+export const DEFAULT ={ person: 'sophia', outfit: 'formal', top: 'formal', trousers: 'black', tint: null, expression: 'Neutral', move: 'Idle' };
 
 export const modelUrl = (person, outfit) => `models/${person}_${outfit}.glb`;
 export const thumbUrl = (person) => `models/thumbs/${person}.jpg`;

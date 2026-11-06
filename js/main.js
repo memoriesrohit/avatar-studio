@@ -101,10 +101,11 @@ function render() {
 
   const person = PEOPLE.find((p) => p.id === config.person);
   const modular = stage.hasModularOutfit();
-  const colourTitle = { original: 'Outfit colour', shirt: 'Shirt colour', tee: 'T-shirt colour' }[config.top];
-  // the person's own outfit, or a white shirt / T-shirt with formal trousers
+  const colourTitle = { formal: 'Suit colour', original: 'Outfit colour', shirt: 'Shirt colour', tee: 'T-shirt colour' }[config.top];
+  // office formal first; the person's own outfit is offered too when it isn't already a suit
+  const ownIsFormal = person.outfits.includes('formal');
   const tops = row('chips', Object.entries(TOPS)
-    .filter(([id]) => id === 'original' || modular)
+    .filter(([id]) => (id === 'formal') || (id === 'original' ? !ownIsFormal : modular))
     .map(([id, label]) => chip(id === 'original' ? `${label} (${OUTFITS[config.outfit]})` : label, config.top === id, () => update({ top: id }))));
   const trousers = row('chips', Object.entries(TROUSERS).map(([id, [label]]) => chip(label, config.trousers === id, () => update({ trousers: id }))));
 
